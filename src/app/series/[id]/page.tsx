@@ -31,6 +31,32 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
       
       if (!Array.isArray(episodesData)) {
         console.error('Episodes data is not an array:', episodesData);
+        // Eğer episodesData bir obje ise ve episodes array'i içeriyorsa
+        if (episodesData && Array.isArray(episodesData.episodes)) {
+          console.log('Found episodes array in response:', episodesData.episodes);
+          setSeries(prev => {
+            const updatedSeries = {
+              ...prev,
+              seasons: prev.seasons.map(season => {
+                const seasonNum = season.season_number || season.seasonNumber || seasonNumber;
+                if (String(seasonNum) === String(seasonNumber)) {
+                  return {
+                    ...season,
+                    season_number: seasonNum,
+                    episodes: episodesData.episodes
+                  };
+                }
+                return season;
+              })
+            };
+            console.log('Updated series data:', JSON.stringify(updatedSeries, null, 2));
+            return updatedSeries;
+          });
+          if (episodesData.episodes.length > 0) {
+            setSelectedEpisode(episodesData.episodes[0]);
+          }
+          return;
+        }
         throw new Error('Invalid episodes data format');
       }
       
@@ -38,13 +64,17 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         const updatedSeries = {
           ...prev,
           seasons: prev.seasons.map(season => {
-            if (String(season.season_number) === String(seasonNumber)) {
-              const seasonEpisodes = episodesData.filter(episode => 
-                String(episode.season_number) === String(seasonNumber)
-              );
-              console.log(`Filtered episodes for season ${seasonNumber}:`, seasonEpisodes);
+            const seasonNum = season.season_number || season.seasonNumber || seasonNumber;
+            if (String(seasonNum) === String(seasonNumber)) {
+              const seasonEpisodes = episodesData.filter(episode => {
+                const episodeSeasonNum = episode.season_number || episode.seasonNumber || episode.season;
+                console.log(`Comparing episode season ${episodeSeasonNum} with season ${seasonNum}`);
+                return String(episodeSeasonNum) === String(seasonNum);
+              });
+              console.log(`Filtered episodes for season ${seasonNum}:`, seasonEpisodes);
               return {
                 ...season,
+                season_number: seasonNum,
                 episodes: seasonEpisodes
               };
             }
@@ -83,7 +113,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         console.log('Seasons data:', JSON.stringify(seasonsData, null, 2));
         
         if (seasonsData && seasonsData.length > 0) {
-          const firstSeasonNumber = seasonsData[0].season_number;
+          // Find the first valid season number
+          const firstSeason = seasonsData[0];
+          const firstSeasonNumber = firstSeason.season_number || firstSeason.seasonNumber || 1;
           console.log('First season number:', firstSeasonNumber);
           
           // 3. Fetch episodes
@@ -95,12 +127,17 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           const fullSeriesData = {
             ...seriesData,
             seasons: seasonsData.map(season => {
-              const seasonEpisodes = episodesData.filter(episode => 
-                String(episode.season_number) === String(season.season_number)
-              );
-              console.log(`Episodes for season ${season.season_number}:`, seasonEpisodes);
+              const seasonNum = season.season_number || season.seasonNumber || 1;
+              const seasonEpisodes = Array.isArray(episodesData) ? episodesData.filter(episode => {
+                const episodeSeasonNum = episode.season_number || episode.seasonNumber || episode.season;
+                console.log(`Comparing episode season ${episodeSeasonNum} with season ${seasonNum}`);
+                return String(episodeSeasonNum) === String(seasonNum);
+              }) : [];
+              
+              console.log(`Episodes for season ${seasonNum}:`, seasonEpisodes);
               return {
                 ...season,
+                season_number: seasonNum,
                 episodes: seasonEpisodes
               };
             })
