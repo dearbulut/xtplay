@@ -29,6 +29,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'i3.hurimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
       }
     ],
   },
