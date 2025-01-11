@@ -90,12 +90,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           console.log('Fetching episodes for season:', firstSeasonNumber);
           const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
           console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
-          console.log('First season number:', firstSeasonNumber);
-          
-          // 3. Fetch episodes
-          console.log('Fetching episodes for season:', firstSeasonNumber);
-          const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
-          console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
           
           // 4. Combine all data
           const fullSeriesData = {
