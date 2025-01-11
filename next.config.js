@@ -13,6 +13,22 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'image.tmdb.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i4.hurimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.hurimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i2.hurimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i3.hurimg.com',
       }
     ],
   },
