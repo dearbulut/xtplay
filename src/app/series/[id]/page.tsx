@@ -18,17 +18,73 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [seasonLoading, setSeasonLoading] = useState(false);
+
+  const handleSeasonChange = async (seasonNumber: number) => {
+    setSeasonLoading(true);
+    setSelectedSeason(seasonNumber);
+    try {
+      const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${seasonNumber}`);
+      
+      // Update the episodes for the selected season
+      setSeries(prev => ({
+        ...prev,
+        seasons: prev.seasons.map(season => {
+          if (season.season_number === seasonNumber) {
+            return {
+              ...season,
+              episodes: episodesData.filter(episode => episode.season === seasonNumber)
+            };
+          }
+          return season;
+        })
+      }));
+
+      // Select first episode of the season if available
+      if (episodesData && episodesData.length > 0) {
+        setSelectedEpisode(episodesData[0]);
+      } else {
+        setSelectedEpisode(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch season episodes:', error);
+    } finally {
+      setSeasonLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // Fetch series info
         const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
-        setSeries(seriesData);
         
-        // Select first episode of first season by default
-        if (seriesData.seasons && seriesData.seasons[0] && seriesData.seasons[0].episodes[0]) {
-          setSelectedSeason(1);
-          setSelectedEpisode(seriesData.seasons[0].episodes[0]);
+        // Fetch seasons
+        const seasonsData = await fetchFromApi(`get_series_seasons&series_id=${params.id}`);
+        
+        // If we have seasons, fetch episodes for the first season
+        if (seasonsData && seasonsData.length > 0) {
+          const firstSeasonNumber = seasonsData[0].season_number;
+          const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
+          
+          // Combine all data
+          const fullSeriesData = {
+            ...seriesData,
+            seasons: seasonsData.map(season => ({
+              ...season,
+              episodes: episodesData.filter(episode => episode.season === season.season_number)
+            }))
+          };
+          
+          setSeries(fullSeriesData);
+          setSelectedSeason(firstSeasonNumber);
+          
+          // Select first episode if available
+          if (episodesData && episodesData.length > 0) {
+            setSelectedEpisode(episodesData[0]);
+          }
+        } else {
+          setSeries(seriesData);
         }
       } catch (error) {
         console.error('Failed to fetch series data:', error);
@@ -120,7 +176,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             {series.seasons?.map((season: any) => (
               <button
                 key={season.season_number}
-                onClick={() => setSelectedSeason(season.season_number)}
+                onClick={() => handleSeasonChange(season.season_number)}
                 className={`px-4 py-2 rounded-full whitespace-nowrap ${
                   selectedSeason === season.season_number ? 'bg-primary text-primary-foreground' : 'bg-secondary'
                 }`}
@@ -131,7 +187,18 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {series.seasons
+            {seasonLoading ? (
+              // Loading skeleton
+              Array.from({ length: 10 }).map((_, index) => (
+                <div key={index} className="flex flex-col bg-card rounded-lg overflow-hidden animate-pulse">
+                  <div className="relative aspect-video bg-secondary" />
+                  <div className="p-3">
+                    <div className="h-4 bg-secondary rounded w-3/4 mb-2" />
+                    <div className="h-4 bg-secondary rounded w-1/2" />
+                  </div>
+                </div>
+              ))
+            ) : series.seasons
               ?.find((s: any) => s.season_number === selectedSeason)
               ?.episodes.map((episode: any) => (
                 <button
@@ -167,4 +234,5 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
       </div>
     </div>
   );
+}
 }
