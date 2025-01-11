@@ -25,9 +25,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
     setSeasonLoading(true);
     setSelectedSeason(seasonNumber);
     try {
-      console.log('Fetching episodes for season:', seasonNumber);
+      console.log(`Fetching episodes for series ${params.id}, season ${seasonNumber}`);
       const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${seasonNumber}`);
-      console.log('Episodes data for season:', seasonNumber, episodesData);
+      console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
       
       if (!Array.isArray(episodesData)) {
         console.error('Episodes data is not an array:', episodesData);
@@ -38,16 +38,20 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         const updatedSeries = {
           ...prev,
           seasons: prev.seasons.map(season => {
-            if (season.season_number === seasonNumber) {
+            if (String(season.season_number) === String(seasonNumber)) {
+              const seasonEpisodes = episodesData.filter(episode => 
+                String(episode.season_number) === String(seasonNumber)
+              );
+              console.log(`Filtered episodes for season ${seasonNumber}:`, seasonEpisodes);
               return {
                 ...season,
-                episodes: episodesData
+                episodes: seasonEpisodes
               };
             }
             return season;
           })
         };
-        console.log('Updated series data:', updatedSeries);
+        console.log('Updated series data:', JSON.stringify(updatedSeries, null, 2));
         return updatedSeries;
       });
 
@@ -68,29 +72,41 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   useEffect(() => {
     async function fetchData() {
       try {
+        // 1. Fetch series info
         console.log('Fetching series info...');
         const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
-        console.log('Series info:', seriesData);
+        console.log('Series info:', JSON.stringify(seriesData, null, 2));
         
+        // 2. Fetch seasons
         console.log('Fetching seasons...');
         const seasonsData = await fetchFromApi(`get_series_seasons&series_id=${params.id}`);
-        console.log('Seasons data:', seasonsData);
+        console.log('Seasons data:', JSON.stringify(seasonsData, null, 2));
         
         if (seasonsData && seasonsData.length > 0) {
           const firstSeasonNumber = seasonsData[0].season_number;
+          console.log('First season number:', firstSeasonNumber);
+          
+          // 3. Fetch episodes
           console.log('Fetching episodes for season:', firstSeasonNumber);
           const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
-          console.log('Episodes data:', episodesData);
+          console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
           
+          // 4. Combine all data
           const fullSeriesData = {
             ...seriesData,
-            seasons: seasonsData.map(season => ({
-              ...season,
-              episodes: episodesData.filter(episode => episode.season === season.season_number)
-            }))
+            seasons: seasonsData.map(season => {
+              const seasonEpisodes = episodesData.filter(episode => 
+                String(episode.season_number) === String(season.season_number)
+              );
+              console.log(`Episodes for season ${season.season_number}:`, seasonEpisodes);
+              return {
+                ...season,
+                episodes: seasonEpisodes
+              };
+            })
           };
           
-          console.log('Full series data:', fullSeriesData);
+          console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
           setSeries(fullSeriesData);
           setSelectedSeason(firstSeasonNumber);
           

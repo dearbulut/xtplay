@@ -33,7 +33,18 @@ export async function fetchFromApi(action: string, params: Record<string, string
     ...params,
   });
 
-  const url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
+  // Construct the URL based on the action type
+  let url;
+  if (action.startsWith('get_series_info')) {
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}`;
+  } else if (action.startsWith('get_series_seasons')) {
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_seasons&series_id=${params.series_id}`;
+  } else if (action.startsWith('get_series_episodes')) {
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_episodes&series_id=${params.series_id}&season_number=${params.season_number}`;
+  } else {
+    url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
+  }
+
   console.log('API Request URL:', url);
 
   try {
@@ -45,7 +56,7 @@ export async function fetchFromApi(action: string, params: Record<string, string
     }
 
     const data = await response.json();
-    console.log('API Response Data:', data);
+    console.log('API Response Data:', JSON.stringify(data, null, 2));
     return data;
   } catch (error) {
     console.error('API Request Error:', error);
