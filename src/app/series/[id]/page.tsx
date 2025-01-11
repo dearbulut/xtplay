@@ -14,6 +14,7 @@ interface SeriesDetailsProps {
 
 export default function SeriesDetails(props: SeriesDetailsProps) {
   const params = use(props.params);
+  console.log('Series ID:', params.id);
   const [series, setSeries] = useState<any>(null);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [selectedEpisode, setSelectedEpisode] = useState<any>(null);
@@ -25,9 +26,14 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
     setSeasonLoading(true);
     setSelectedSeason(seasonNumber);
     try {
+      if (!params.id) {
+        console.error('No series ID provided');
+        return;
+      }
+
       // Fetch all episodes
       console.log(`Fetching episodes for series ${params.id}`);
-      const seriesDetails = await fetchFromApi(`get_series_episodes&series_id=${params.id}`);
+      const seriesDetails = await fetchFromApi('get_series_episodes', { series_id: params.id });
       console.log('Series details:', JSON.stringify(seriesDetails, null, 2));
       
       const allEpisodes = seriesDetails.episodes || {};
@@ -68,14 +74,19 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   useEffect(() => {
     async function fetchData() {
       try {
+        if (!params.id) {
+          console.error('No series ID provided');
+          return;
+        }
+
         // 1. Fetch series info
-        console.log('Fetching series info...');
-        const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
+        console.log('Fetching series info for ID:', params.id);
+        const seriesData = await fetchFromApi('get_series_info', { series_id: params.id });
         console.log('Series info:', JSON.stringify(seriesData, null, 2));
         
         // 2. Fetch series details including episodes
-        console.log('Fetching series details...');
-        const seriesDetails = await fetchFromApi(`get_series_episodes&series_id=${params.id}`);
+        console.log('Fetching series details for ID:', params.id);
+        const seriesDetails = await fetchFromApi('get_series_episodes', { series_id: params.id });
         console.log('Series details:', JSON.stringify(seriesDetails, null, 2));
         
         // Extract episodes data

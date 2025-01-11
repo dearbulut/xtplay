@@ -35,6 +35,10 @@ export async function fetchFromApi(action: string, params: Record<string, string
 
   // Construct the URL based on the action type
   let url;
+  if (!params.series_id) {
+    throw new Error('Missing series_id parameter');
+  }
+
   if (action.startsWith('get_series_info')) {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}`;
   } else if (action.startsWith('get_series_seasons')) {
