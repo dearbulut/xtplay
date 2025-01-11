@@ -234,38 +234,40 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
                 return currentSeason.episodes.map((episode: any) => {
                   console.log('Rendering episode:', episode);
                   return (
-                <button
-                  key={episode.id}
-                  onClick={() => setSelectedEpisode(episode)}
-                  className={`flex flex-col bg-card rounded-lg overflow-hidden hover:ring-2 ring-primary transition-all ${
-                    selectedEpisode?.id === episode.id ? 'ring-2' : ''
-                  }`}
-                >
-                  <div className="relative aspect-video">
-                    {episode.info?.movie_image ? (
-                      <Image
-                        src={episode.info.movie_image}
-                        alt={episode.title}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-secondary flex items-center justify-center">
-                        <Film className="w-8 h-8" />
+                    <button
+                      key={episode.id}
+                      onClick={() => setSelectedEpisode(episode)}
+                      className={`flex flex-col bg-card rounded-lg overflow-hidden hover:ring-2 ring-primary transition-all ${
+                        selectedEpisode?.id === episode.id ? 'ring-2' : ''
+                      }`}
+                    >
+                      <div className="relative aspect-video">
+                        {episode.info?.movie_image ? (
+                          <Image
+                            src={episode.info.movie_image}
+                            alt={episode.title}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-secondary flex items-center justify-center">
+                            <Film className="w-8 h-8" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-medium line-clamp-2">
-                      Episode {episode.episode_num}: {episode.title}
-                    </h3>
-                  </div>
-                </button>
-              ))}
+                      <div className="p-3">
+                        <h3 className="font-medium line-clamp-2">
+                          Episode {episode.episode_num}: {episode.title}
+                        </h3>
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
 }
