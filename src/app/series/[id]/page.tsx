@@ -21,29 +21,43 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   const [seasonLoading, setSeasonLoading] = useState(false);
 
   const handleSeasonChange = async (seasonNumber: number) => {
+    console.log('Changing to season:', seasonNumber);
     setSeasonLoading(true);
     setSelectedSeason(seasonNumber);
     try {
+      console.log('Fetching episodes for season:', seasonNumber);
       const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${seasonNumber}`);
+      console.log('Episodes data for season:', seasonNumber, episodesData);
+      
+      if (!Array.isArray(episodesData)) {
+        console.error('Episodes data is not an array:', episodesData);
+        throw new Error('Invalid episodes data format');
+      }
       
       // Update the episodes for the selected season
-      setSeries(prev => ({
-        ...prev,
-        seasons: prev.seasons.map(season => {
-          if (season.season_number === seasonNumber) {
-            return {
-              ...season,
-              episodes: episodesData.filter(episode => episode.season === seasonNumber)
-            };
-          }
-          return season;
-        })
-      }));
+      setSeries(prev => {
+        const updatedSeries = {
+          ...prev,
+          seasons: prev.seasons.map(season => {
+            if (season.season_number === seasonNumber) {
+              return {
+                ...season,
+                episodes: episodesData
+              };
+            }
+            return season;
+          })
+        };
+        console.log('Updated series data:', updatedSeries);
+        return updatedSeries;
+      });
 
       // Select first episode of the season if available
       if (episodesData && episodesData.length > 0) {
+        console.log('Setting first episode:', episodesData[0]);
         setSelectedEpisode(episodesData[0]);
       } else {
+        console.log('No episodes available for season:', seasonNumber);
         setSelectedEpisode(null);
       }
     } catch (error) {
@@ -57,15 +71,21 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
     async function fetchData() {
       try {
         // Fetch series info
+        console.log('Fetching series info...');
         const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
+        console.log('Series info:', seriesData);
         
         // Fetch seasons
+        console.log('Fetching seasons...');
         const seasonsData = await fetchFromApi(`get_series_seasons&series_id=${params.id}`);
+        console.log('Seasons data:', seasonsData);
         
         // If we have seasons, fetch episodes for the first season
         if (seasonsData && seasonsData.length > 0) {
           const firstSeasonNumber = seasonsData[0].season_number;
+          console.log('Fetching episodes for season:', firstSeasonNumber);
           const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
+          console.log('Episodes data:', episodesData);
           
           // Combine all data
           const fullSeriesData = {
@@ -76,6 +96,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             }))
           };
           
+          console.log('Full series data:', fullSeriesData);
           setSeries(fullSeriesData);
           setSelectedSeason(firstSeasonNumber);
           
@@ -198,9 +219,21 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
                   </div>
                 </div>
               ))
-            ) : series.seasons
-              ?.find((s: any) => s.season_number === selectedSeason)
-              ?.episodes.map((episode: any) => (
+            ) : (
+              (() => {
+                const currentSeason = series.seasons?.find((s: any) => s.season_number === selectedSeason);
+                console.log('Current season:', currentSeason);
+                if (!currentSeason?.episodes?.length) {
+                  console.log('No episodes found for season:', selectedSeason);
+                  return (
+                    <div className="col-span-full text-center py-8">
+                      <p className="text-muted-foreground">No episodes found for this season</p>
+                    </div>
+                  );
+                }
+                return currentSeason.episodes.map((episode: any) => {
+                  console.log('Rendering episode:', episode);
+                  return (
                 <button
                   key={episode.id}
                   onClick={() => setSelectedEpisode(episode)}

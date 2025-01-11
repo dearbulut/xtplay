@@ -33,13 +33,24 @@ export async function fetchFromApi(action: string, params: Record<string, string
     ...params,
   });
 
-  const response = await fetch(`${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`);
-  
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
+  const url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
+  console.log('API Request URL:', url);
 
-  return response.json();
+  try {
+    const response = await fetch(url);
+    console.log('API Response Status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('API Response Data:', data);
+    return data;
+  } catch (error) {
+    console.error('API Request Error:', error);
+    throw error;
+  }
 }
 
 export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie' | 'series') {
