@@ -25,13 +25,10 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
     setSeasonLoading(true);
     setSelectedSeason(seasonNumber);
     try {
-      // Fetch series details to get episodes
-      const seriesDetails = await fetchFromApi(`get_series_seasons&series_id=${params.id}`);
-      console.log('Series details:', JSON.stringify(seriesDetails, null, 2));
-      
-      const seasonsData = seriesDetails.episodes || {};
-      const seasonEpisodes = seasonsData[seasonNumber] || [];
-      console.log(`Episodes for season ${seasonNumber}:`, seasonEpisodes);
+      // Fetch episodes for the selected season
+      console.log(`Fetching episodes for series ${params.id}, season ${seasonNumber}`);
+      const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${seasonNumber}`);
+      console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
       
       setSeries(prev => {
         const updatedSeries = {
@@ -40,7 +37,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             if (season.season_number === seasonNumber) {
               return {
                 ...season,
-                episodes: seasonEpisodes
+                episodes: episodesData || []
               };
             }
             return season;
@@ -50,9 +47,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         return updatedSeries;
       });
 
-      if (seasonEpisodes && seasonEpisodes.length > 0) {
-        console.log('Setting first episode:', seasonEpisodes[0]);
-        setSelectedEpisode(seasonEpisodes[0]);
+      if (episodesData && episodesData.length > 0) {
+        console.log('Setting first episode:', episodesData[0]);
+        setSelectedEpisode(episodesData[0]);
       } else {
         console.log('No episodes available for season:', seasonNumber);
         setSelectedEpisode(null);
@@ -77,16 +74,22 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         const seriesDetails = await fetchFromApi(`get_series_seasons&series_id=${params.id}`);
         console.log('Series details:', JSON.stringify(seriesDetails, null, 2));
         
-        // Extract seasons from the response
-        const seasonsData = seriesDetails.episodes || {};
-        console.log('Extracted seasons data:', seasonsData);
+        // Get total number of seasons from episode_run_time or default to 1
+        const totalSeasons = seriesDetails.episodes_count || 1;
+        console.log('Total seasons:', totalSeasons);
         
-        // Get available season numbers
-        const seasonNumbers = Object.keys(seasonsData).map(Number).sort((a, b) => a - b);
-        console.log('Available season numbers:', seasonNumbers);
+        // Create an array of season numbers
+        const seasonNumbers = Array.from({ length: totalSeasons }, (_, i) => i + 1);
+        console.log('Season numbers:', seasonNumbers);
         
         if (seasonNumbers.length > 0) {
           const firstSeasonNumber = seasonNumbers[0];
+          console.log('First season number:', firstSeasonNumber);
+          
+          // 3. Fetch episodes for first season
+          console.log('Fetching episodes for season:', firstSeasonNumber);
+          const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
+          console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
           console.log('First season number:', firstSeasonNumber);
           
           // 3. Fetch episodes
@@ -98,11 +101,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           const fullSeriesData = {
             ...seriesData,
             seasons: seasonNumbers.map(seasonNum => {
-              const seasonEpisodes = seasonsData[seasonNum] || [];
-              console.log(`Episodes for season ${seasonNum}:`, seasonEpisodes);
               return {
                 season_number: seasonNum,
-                episodes: seasonEpisodes
+                episodes: seasonNum === firstSeasonNumber ? episodesData : []
               };
             })
           };
