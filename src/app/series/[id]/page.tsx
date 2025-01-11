@@ -34,7 +34,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         throw new Error('Invalid episodes data format');
       }
       
-      // Update the episodes for the selected season
       setSeries(prev => {
         const updatedSeries = {
           ...prev,
@@ -52,7 +51,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         return updatedSeries;
       });
 
-      // Select first episode of the season if available
       if (episodesData && episodesData.length > 0) {
         console.log('Setting first episode:', episodesData[0]);
         setSelectedEpisode(episodesData[0]);
@@ -70,24 +68,20 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch series info
         console.log('Fetching series info...');
         const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
         console.log('Series info:', seriesData);
         
-        // Fetch seasons
         console.log('Fetching seasons...');
         const seasonsData = await fetchFromApi(`get_series_seasons&series_id=${params.id}`);
         console.log('Seasons data:', seasonsData);
         
-        // If we have seasons, fetch episodes for the first season
         if (seasonsData && seasonsData.length > 0) {
           const firstSeasonNumber = seasonsData[0].season_number;
           console.log('Fetching episodes for season:', firstSeasonNumber);
           const episodesData = await fetchFromApi(`get_series_episodes&series_id=${params.id}&season_number=${firstSeasonNumber}`);
           console.log('Episodes data:', episodesData);
           
-          // Combine all data
           const fullSeriesData = {
             ...seriesData,
             seasons: seasonsData.map(season => ({
@@ -100,7 +94,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           setSeries(fullSeriesData);
           setSelectedSeason(firstSeasonNumber);
           
-          // Select first episode if available
           if (episodesData && episodesData.length > 0) {
             setSelectedEpisode(episodesData[0]);
           }
@@ -119,15 +112,61 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   if (loading || !series) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
+  const renderEpisodes = () => {
+    const currentSeason = series.seasons?.find((s: any) => s.season_number === selectedSeason);
+    console.log('Current season:', currentSeason);
+    
+    if (!currentSeason?.episodes?.length) {
+      console.log('No episodes found for season:', selectedSeason);
+      return (
+        <div className="col-span-full text-center py-8">
+          <p className="text-muted-foreground">No episodes found for this season</p>
+        </div>
+      );
+    }
+
+    return currentSeason.episodes.map((episode: any) => {
+      console.log('Rendering episode:', episode);
+      return (
+        <button
+          key={episode.id}
+          onClick={() => setSelectedEpisode(episode)}
+          className={`flex flex-col bg-card rounded-lg overflow-hidden hover:ring-2 ring-primary transition-all ${
+            selectedEpisode?.id === episode.id ? 'ring-2' : ''
+          }`}
+        >
+          <div className="relative aspect-video">
+            {episode.info?.movie_image ? (
+              <Image
+                src={episode.info.movie_image}
+                alt={episode.title}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-secondary flex items-center justify-center">
+                <Film className="w-8 h-8" />
+              </div>
+            )}
+          </div>
+          <div className="p-3">
+            <h3 className="font-medium line-clamp-2">
+              Episode {episode.episode_num}: {episode.title}
+            </h3>
+          </div>
+        </button>
+      );
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-[300px,1fr] gap-6">
-        {/* Series poster */}
         <div className="relative aspect-[2/3] md:aspect-auto">
           {series.cover ? (
             <Image
@@ -143,7 +182,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           )}
         </div>
 
-        {/* Series info */}
         <div className="space-y-4">
           <h1 className="text-2xl md:text-3xl font-bold">{series.name}</h1>
           {series.plot && (
@@ -176,12 +214,11 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         </div>
       </div>
 
-      {/* Video player and episode selection */}
       <div className="space-y-4">
         {selectedEpisode ? (
           <div className="rounded-lg overflow-hidden">
             <VideoPlayer
-              src={getStreamUrl( selectedEpisode.id, 'series')}
+              src={getStreamUrl(selectedEpisode.id, 'series')}
               poster={selectedEpisode.info?.movie_image || series.cover}
             />
           </div>
@@ -191,7 +228,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           </div>
         )}
 
-        {/* Season and episode selection */}
         <div className="space-y-4">
           <div className="flex gap-2 overflow-x-auto pb-4">
             {series.seasons?.map((season: any) => (
@@ -209,7 +245,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {seasonLoading ? (
-              // Loading skeleton
               Array.from({ length: 10 }).map((_, index) => (
                 <div key={index} className="flex flex-col bg-card rounded-lg overflow-hidden animate-pulse">
                   <div className="relative aspect-video bg-secondary" />
@@ -220,51 +255,8 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
                 </div>
               ))
             ) : (
-              (() => {
-                const currentSeason = series.seasons?.find((s: any) => s.season_number === selectedSeason);
-                console.log('Current season:', currentSeason);
-                if (!currentSeason?.episodes?.length) {
-                  console.log('No episodes found for season:', selectedSeason);
-                  return (
-                    <div className="col-span-full text-center py-8">
-                      <p className="text-muted-foreground">No episodes found for this season</p>
-                    </div>
-                  );
-                }
-                return currentSeason.episodes.map((episode: any) => {
-                  console.log('Rendering episode:', episode);
-                  return (
-                    <button
-                      key={episode.id}
-                      onClick={() => setSelectedEpisode(episode)}
-                      className={`flex flex-col bg-card rounded-lg overflow-hidden hover:ring-2 ring-primary transition-all ${
-                        selectedEpisode?.id === episode.id ? 'ring-2' : ''
-                      }`}
-                    >
-                      <div className="relative aspect-video">
-                        {episode.info?.movie_image ? (
-                          <Image
-                            src={episode.info.movie_image}
-                            alt={episode.title}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-secondary flex items-center justify-center">
-                            <Film className="w-8 h-8" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <h3 className="font-medium line-clamp-2">
-                          Episode {episode.episode_num}: {episode.title}
-                        </h3>
-                      </div>
-                    </button>
-                  );
-                });
-              })()}
-            </div>
+              renderEpisodes()
+            )}
           </div>
         </div>
       </div>
