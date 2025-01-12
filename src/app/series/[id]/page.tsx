@@ -32,7 +32,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
       }
 
       // Fetch episodes for the selected season
-      console.log(`Fetching episodes for season ${seasonNumber}...`);
+      console.log(`Fetching episodes for series ${params.id}, season ${seasonNumber}`);
       const episodesData = await fetchFromApi('get_series_episodes', { 
         series_id: params.id,
         season_number: String(seasonNumber)
@@ -45,12 +45,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           ...prev,
           seasons: prev.seasons.map(season => {
             if (season.season_number === seasonNumber) {
-              const episodes = Array.isArray(episodesData) ? episodesData :
-                             episodesData.episodes ? episodesData.episodes :
-                             [];
               return {
                 ...season,
-                episodes: episodes
+                episodes: episodesData.episodes?.[seasonNumber] || []
               };
             }
             return season;
@@ -60,13 +57,11 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         return updatedSeries;
       });
 
-      // Select first episode if available
-      const episodes = Array.isArray(episodesData) ? episodesData :
-                      episodesData.episodes ? episodesData.episodes :
-                      [];
-      if (episodes.length > 0) {
-        console.log('Setting first episode:', episodes[0]);
-        setSelectedEpisode(episodes[0]);
+      // Select first episode of the season
+      const seasonEpisodes = episodesData.episodes?.[seasonNumber] || [];
+      if (seasonEpisodes.length > 0) {
+        console.log('Setting first episode:', seasonEpisodes[0]);
+        setSelectedEpisode(seasonEpisodes[0]);
       } else {
         console.log('No episodes available for season:', seasonNumber);
         setSelectedEpisode(null);
@@ -92,59 +87,17 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         console.log('Series info:', JSON.stringify(seriesInfo, null, 2));
 
         // 2. Fetch series data with episodes
-        console.log('Fetching series data with episodes...');
+        console.log('Fetching series data...');
         const seriesData = await fetchFromApi('get_series_seasons', { series_id: params.id });
         console.log('Series data:', JSON.stringify(seriesData, null, 2));
 
-        // Process series data to extract seasons and episodes
-        console.log('Processing series data...');
-        
-        // Extract seasons and episodes from API response
-        let seasons: any[] = [];
-        
-        if (seriesData && typeof seriesData === 'object') {
-          // If we have episodes object with season keys
-          if (seriesData.episodes && typeof seriesData.episodes === 'object') {
-            seasons = Object.entries(seriesData.episodes)
-              .map(([seasonNum, episodes]) => ({
-                season_number: parseInt(seasonNum),
-                name: `Season ${seasonNum}`,
-                episodes: Array.isArray(episodes) ? episodes : []
-              }))
-              .sort((a, b) => a.season_number - b.season_number);
-          }
-          // If we have a seasons array
-          else if (Array.isArray(seriesData)) {
-            // Group episodes by season using regex pattern from titles
-            const episodesBySeasons = new Map<number, any[]>();
-            
-            seriesData.forEach(episode => {
-              const seasonMatch = episode.title?.match(/S(\d+)\s*E\d+|Season\s*(\d+)/i);
-              if (seasonMatch) {
-                const seasonNum = parseInt(seasonMatch[1] || seasonMatch[2]);
-                if (!episodesBySeasons.has(seasonNum)) {
-                  episodesBySeasons.set(seasonNum, []);
-                }
-                episodesBySeasons.get(seasonNum)?.push(episode);
-              }
-            });
-            
-            seasons = Array.from(episodesBySeasons.entries())
-              .map(([seasonNum, episodes]) => ({
-                season_number: seasonNum,
-                name: `Season ${seasonNum}`,
-                episodes: episodes.sort((a, b) => {
-                  const aMatch = a.title?.match(/E(\d+)/i);
-                  const bMatch = b.title?.match(/E(\d+)/i);
-                  const aNum = aMatch ? parseInt(aMatch[1]) : 0;
-                  const bNum = bMatch ? parseInt(bMatch[1]) : 0;
-                  return aNum - bNum;
-                })
-              }))
-              .sort((a, b) => a.season_number - b.season_number);
-          }
-        }
-        
+        // Extract seasons from episodes object
+        const seasons = Object.keys(seriesData.episodes || {}).map(seasonNum => ({
+          season_number: parseInt(seasonNum),
+          name: `Season ${seasonNum}`,
+          episodes: seriesData.episodes[seasonNum] || []
+        })).sort((a, b) => a.season_number - b.season_number);
+
         console.log('Processed seasons:', seasons);
 
         if (seasons.length > 0) {
@@ -152,7 +105,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           const firstSeason = seasons[0];
           console.log('First season:', firstSeason);
 
-          // 4. Combine all data
+          // 3. Combine all data
           const fullSeriesData = {
             ...seriesInfo,
             seasons: seasons
