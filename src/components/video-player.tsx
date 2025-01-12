@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import Hls from 'hls.js';
 import { Loader2 } from 'lucide-react';
 
 interface VideoPlayerProps {
@@ -35,115 +34,61 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
     if (!videoRef.current || !resolvedSrc) return;
 
     const video = videoRef.current;
-    let hls: Hls | null = null;
 
     const initializeVideo = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Always use direct playback first
+        // Set up video properties
         video.src = resolvedSrc;
         video.volume = 1;
         video.muted = false;
+        video.controls = true;
+        video.preload = 'auto';
+        video.crossOrigin = 'anonymous';
 
+        // Event handlers
         const handleCanPlay = () => {
-          console.log('Video can play directly');
+          console.log('Video can play');
           setIsLoading(false);
+          video.volume = 1;
+          video.muted = false;
           if (autoPlay) {
             video.play().catch(console.error);
           }
         };
 
         const handleError = () => {
-          console.error('Direct playback error:', video.error);
-          // If direct playback fails and it's not MKV/MP4, try HLS
-          if (container !== 'mkv' && container !== 'mp4' && Hls.isSupported()) {
-            initializeHLS();
-          } else {
-            setError('Video playback error');
-            setIsLoading(false);
-          }
+          console.error('Video error:', video.error);
+          setError('Video playback error');
+          setIsLoading(false);
         };
 
+        const handleLoadedMetadata = () => {
+          console.log('Video metadata loaded');
+          video.volume = 1;
+          video.muted = false;
+        };
+
+        // Add event listeners
         video.addEventListener('canplay', handleCanPlay);
         video.addEventListener('error', handleError);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
+        // Load the video
         video.load();
 
+        // Return cleanup function
         return () => {
           video.removeEventListener('canplay', handleCanPlay);
           video.removeEventListener('error', handleError);
+          video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         };
       } catch (error) {
         console.error('Video initialization error:', error);
         setError('Failed to initialize video player');
       }
-    };
-
-    const initializeHLS = () => {
-      if (!Hls.isSupported()) {
-        console.error('HLS not supported');
-        setError('HLS playback not supported');
-        return;
-      }
-
-      console.log('Initializing HLS with source:', resolvedSrc);
-      hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 90,
-        xhrSetup: function(xhr) {
-          xhr.withCredentials = false;
-        },
-        maxLoadingRetry: 4,
-        manifestLoadingTimeOut: 20000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 1000,
-      });
-
-      hls.loadSource(resolvedSrc);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('HLS manifest parsed');
-        setIsLoading(false);
-        video.volume = 1;
-        video.muted = false;
-        if (autoPlay) {
-          video.play().catch(console.error);
-        }
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        console.log('HLS error:', event, data);
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              console.error('Network error:', data.details);
-              if (data.details === 'manifestLoadError') {
-                // If HLS fails, try direct playback again
-                hls?.destroy();
-                video.src = resolvedSrc;
-                video.load();
-              } else {
-                hls?.startLoad();
-              }
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.error('Media error:', data.details);
-              hls?.recoverMediaError();
-              break;
-            default:
-              console.error('Fatal error:', data.type, data.details);
-              setError('Stream error');
-              if (hls) {
-                hls.destroy();
-              }
-              break;
-          }
-        }
-      });
     };
 
     const cleanup = initializeVideo();
@@ -152,16 +97,13 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       if (cleanup && typeof cleanup === 'function') {
         cleanup();
       }
-      if (hls) {
-        hls.destroy();
-      }
       if (video) {
         video.pause();
         video.src = '';
         video.load();
       }
     };
-  }, [resolvedSrc, container, autoPlay]);
+  }, [resolvedSrc, autoPlay]);
 
   return (
     <div className="relative group">
