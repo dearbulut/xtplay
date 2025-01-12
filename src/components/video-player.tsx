@@ -42,95 +42,91 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       setError(null);
 
       try {
-        // Try direct playback first
-        video.src = resolvedSrc;
-        video.volume = 1;
-        
-        // Add event listeners
-        const handleError = () => {
-          console.error('Video error:', video.error);
-          setError('Video playback error');
-          setIsLoading(false);
-        };
+        // Always try HLS first
+        if (Hls.isSupported()) {
+          console.log('Initializing HLS with source:', resolvedSrc);
+          hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: false,
+            backBufferLength: 90,
+            xhrSetup: function(xhr) {
+              xhr.withCredentials = false;
+            },
+            maxLoadingRetry: 4,
+            manifestLoadingTimeOut: 20000,
+            manifestLoadingMaxRetry: 4,
+            manifestLoadingRetryDelay: 1000,
+          });
 
-        const handleLoadedData = () => {
-          setIsLoading(false);
-          if (autoPlay) {
-            video.play().catch(console.error);
-          }
-        };
+          hls.loadSource(resolvedSrc);
+          hls.attachMedia(video);
 
-        video.addEventListener('error', handleError);
-        video.addEventListener('loadeddata', handleLoadedData);
-
-        // Try to load the video
-        await video.load();
-
-        // If direct playback fails, try HLS
-        if (video.error) {
-          console.log('Direct playback failed, trying HLS...');
-          
-          if (Hls.isSupported()) {
-            hls = new Hls({
-              enableWorker: true,
-              lowLatencyMode: false,
-              backBufferLength: 90,
-              xhrSetup: function(xhr) {
-                xhr.withCredentials = false;
-              },
-              maxLoadingRetry: 4,
-              manifestLoadingTimeOut: 20000,
-              manifestLoadingMaxRetry: 4,
-              manifestLoadingRetryDelay: 1000,
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log('HLS manifest parsed, attempting playback');
+            setIsLoading(false);
+            video.play().catch(error => {
+              console.error('HLS playback failed:', error);
+              fallbackToDirectPlayback();
             });
+          });
 
-            hls.loadSource(resolvedSrc);
-            hls.attachMedia(video);
-
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-              setIsLoading(false);
-              if (autoPlay) {
-                video.play().catch(console.error);
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            console.log('HLS error:', event, data);
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.error('Network error:', data.details);
+                  hls?.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.error('Media error:', data.details);
+                  hls?.recoverMediaError();
+                  break;
+                default:
+                  console.error('Fatal error:', data.type, data.details);
+                  fallbackToDirectPlayback();
+                  break;
               }
-            });
-
-            hls.on(Hls.Events.ERROR, (event, data) => {
-              if (data.fatal) {
-                switch (data.type) {
-                  case Hls.ErrorTypes.NETWORK_ERROR:
-                    console.error('Network error:', data.details);
-                    hls?.startLoad();
-                    break;
-                  case Hls.ErrorTypes.MEDIA_ERROR:
-                    console.error('Media error:', data.details);
-                    hls?.recoverMediaError();
-                    break;
-                  default:
-                    console.error('Fatal error:', data.type, data.details);
-                    setError('Stream error');
-                    if (hls) {
-                      hls.destroy();
-                    }
-                    break;
-                }
-              }
-            });
-          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS support (Safari)
-            video.src = resolvedSrc;
-          } else {
-            setError('Video playback not supported');
-          }
+            }
+          });
+        } else {
+          fallbackToDirectPlayback();
         }
-
-        return () => {
-          video.removeEventListener('error', handleError);
-          video.removeEventListener('loadeddata', handleLoadedData);
-        };
       } catch (error) {
         console.error('Video initialization error:', error);
-        setError('Failed to initialize video player');
+        fallbackToDirectPlayback();
       }
+    };
+
+    const fallbackToDirectPlayback = () => {
+      console.log('Falling back to direct playback');
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+
+      video.src = resolvedSrc;
+      video.load();
+      
+      const handleCanPlay = () => {
+        console.log('Video can play, starting playback');
+        setIsLoading(false);
+        video.play().catch(console.error);
+      };
+
+      const handleError = () => {
+        console.error('Direct playback error:', video.error);
+        setError('Video playback error');
+        setIsLoading(false);
+      };
+
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('error', handleError);
+
+      return () => {
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('error', handleError);
+      };
     };
 
     const cleanup = initializeVideo();
@@ -141,6 +137,11 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       }
       if (hls) {
         hls.destroy();
+      }
+      if (video) {
+        video.pause();
+        video.src = '';
+        video.load();
       }
     };
   }, [resolvedSrc, container, autoPlay]);
@@ -161,7 +162,6 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
         controlsList="nodownload"
         preload="auto"
         muted={false}
-        autoPlay={autoPlay}
       />
       {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
