@@ -42,9 +42,9 @@ export async function fetchFromApi(action: string, params: Record<string, string
   } else if (action === 'get_series_info') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}`;
   } else if (action === 'get_series_seasons') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_seasons&series_id=${params.series_id}`;
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}`;
   } else if (action === 'get_series_episodes') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_episodes&series_id=${params.series_id}&season_id=${params.season_number}`;
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}&season=${params.season_number}`;
   } else {
     url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
   }
@@ -75,12 +75,16 @@ export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie
     throw new Error('Missing IPTV credentials');
   }
 
-  // For series, we need to use the series container format
+  // Different URL formats for different stream types
   if (streamType === 'series') {
     return `${baseUrl}/series/${username}/${password}/${streamId}.${container || 'ts'}`;
+  } else if (streamType === 'movie') {
+    return `${baseUrl}/movie/${username}/${password}/${streamId}.${container || 'mp4'}`;
+  } else if (streamType === 'live') {
+    return `${baseUrl}/live/${username}/${password}/${streamId}.m3u8`;
   }
 
-  return `${baseUrl}/${streamType}/${username}/${password}/${streamId}.m3u8`;
+  return `${baseUrl}/${streamType}/${username}/${password}/${streamId}`;
 }
 
 export async function verifyIPTVCredentials(url: string, username: string, password: string) {
