@@ -42,7 +42,13 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       setError(null);
 
       try {
-        // Always try HLS first
+        // For MKV and MP4, try direct playback first
+        if (container === 'mkv' || container === 'mp4') {
+          console.log('Using direct playback for:', container);
+          return initializeDirectPlayback();
+        }
+
+        // For other formats, try HLS first
         if (Hls.isSupported()) {
           console.log('Initializing HLS with source:', resolvedSrc);
           hls = new Hls({
@@ -66,7 +72,7 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
             setIsLoading(false);
             video.play().catch(error => {
               console.error('HLS playback failed:', error);
-              fallbackToDirectPlayback();
+              initializeDirectPlayback();
             });
           });
 
@@ -76,7 +82,11 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
                   console.error('Network error:', data.details);
-                  hls?.startLoad();
+                  if (data.details === 'manifestLoadTimeOut') {
+                    initializeDirectPlayback();
+                  } else {
+                    hls?.startLoad();
+                  }
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
                   console.error('Media error:', data.details);
@@ -84,34 +94,33 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
                   break;
                 default:
                   console.error('Fatal error:', data.type, data.details);
-                  fallbackToDirectPlayback();
+                  initializeDirectPlayback();
                   break;
               }
             }
           });
         } else {
-          fallbackToDirectPlayback();
+          initializeDirectPlayback();
         }
       } catch (error) {
         console.error('Video initialization error:', error);
-        fallbackToDirectPlayback();
+        initializeDirectPlayback();
       }
     };
 
-    const fallbackToDirectPlayback = () => {
-      console.log('Falling back to direct playback');
+    const initializeDirectPlayback = () => {
+      console.log('Initializing direct playback');
       if (hls) {
         hls.destroy();
         hls = null;
       }
 
-      video.src = resolvedSrc;
-      video.load();
-      
       const handleCanPlay = () => {
-        console.log('Video can play, starting playback');
+        console.log('Video can play directly');
         setIsLoading(false);
-        video.play().catch(console.error);
+        if (autoPlay) {
+          video.play().catch(console.error);
+        }
       };
 
       const handleError = () => {
@@ -122,6 +131,9 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
 
       video.addEventListener('canplay', handleCanPlay);
       video.addEventListener('error', handleError);
+
+      video.src = resolvedSrc;
+      video.load();
 
       return () => {
         video.removeEventListener('canplay', handleCanPlay);
