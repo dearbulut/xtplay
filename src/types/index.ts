@@ -37,4 +37,5 @@ export interface VideoPlayerProps {
   poster?: string;
   autoPlay?: boolean;
   isDirectMp4?: boolean;
+  container?: 'm3u8' | 'ts' | 'mp4';
 }

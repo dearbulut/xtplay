@@ -75,11 +75,16 @@ export async function fetchFromApi(action: string, params: Record<string, string
   }
 }
 
-export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie' | 'series') {
+export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie' | 'series', container?: string) {
   const { baseUrl, username, password } = getIPTVCredentials();
 
   if (!baseUrl || !username || !password) {
     throw new Error('Missing IPTV credentials');
+  }
+
+  // For series, we need to use the series container format
+  if (streamType === 'series') {
+    return `${baseUrl}/series/${username}/${password}/${streamId}.${container || 'ts'}`;
   }
 
   return `${baseUrl}/${streamType}/${username}/${password}/${streamId}.m3u8`;

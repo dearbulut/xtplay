@@ -8,7 +8,7 @@ import { VideoPlayerProps } from '@/types';
 
 
 
-export function VideoPlayer({ src, poster, autoPlay = false, isDirectMp4 = false }: VideoPlayerProps) {
+export function VideoPlayer({ src, poster, autoPlay = false, isDirectMp4 = false, container = 'm3u8' }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
   const [hls, setHls] = useState<Hls | null>(null);
@@ -93,10 +93,13 @@ export function VideoPlayer({ src, poster, autoPlay = false, isDirectMp4 = false
         setIsBuffering(false);
       };
       
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    } else if (container === 'ts') {
+      // Direct TS stream
+      video.src = resolvedSrc;
+    } else if (container === 'm3u8' && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS support (Safari)
       video.src = resolvedSrc;
-    } else if (Hls.isSupported()) {
+    } else if (container === 'm3u8' && Hls.isSupported()) {
       // Create new HLS instance
       hlsInstance = new Hls({
         enableWorker: true,

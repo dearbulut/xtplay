@@ -261,7 +261,8 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         {selectedEpisode ? (
           <div className="rounded-lg overflow-hidden">
             <VideoPlayer
-              src={getStreamUrl(selectedEpisode.id, 'series')}
+              src={getStreamUrl(selectedEpisode.id, 'series', selectedEpisode.container_extension)}
+              container={selectedEpisode.container_extension || 'ts'}
               poster={selectedEpisode.info?.movie_image || series.cover}
             />
           </div>
