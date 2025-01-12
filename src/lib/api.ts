@@ -46,9 +46,7 @@ export async function fetchFromApi(action: string, params: Record<string, string
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series`;
   } else if (action === 'get_categories') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_categories`;
-  } else if (action === 'get_series_info') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}`;
-  } else if (action === 'get_series_seasons') {
+  } else if (action === 'get_series_info' || action === 'get_series_seasons') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}`;
   } else if (action === 'get_series_episodes') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}&season_id=${params.season_number}`;
