@@ -95,8 +95,15 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         console.log('Series info:', info);
         console.log('Episodes:', episodes);
 
-        // Get available seasons from episodes
-        const seasonNumbers = Object.keys(episodes).map(Number).sort((a, b) => a - b);
+        // Fetch seasons
+        console.log('Fetching seasons...');
+        const seasonsData = await fetchFromApi('get_series_seasons', { series_id: params.id });
+        console.log('Seasons data:', seasonsData);
+
+        // Get available seasons
+        const seasonNumbers = Array.isArray(seasonsData) ? 
+          seasonsData.map(s => s.season_number) : 
+          [1]; // Default to season 1 if no seasons data
         console.log('Available seasons:', seasonNumbers);
 
         if (seasonNumbers.length > 0) {
@@ -104,11 +111,19 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           const firstSeasonNumber = seasonNumbers[0];
           console.log('First season number:', firstSeasonNumber);
 
-          // Create seasons array with episodes
+          // Fetch episodes for first season
+          console.log('Fetching episodes for first season:', firstSeasonNumber);
+          const episodesData = await fetchFromApi('get_series_episodes', { 
+            series_id: params.id,
+            season_number: firstSeasonNumber
+          });
+          console.log('Episodes data:', episodesData);
+
+          // Create seasons array
           const seasons = seasonNumbers.map(seasonNum => ({
             season_number: seasonNum,
             name: `Season ${seasonNum}`,
-            episodes: episodes[seasonNum] || []
+            episodes: seasonNum === firstSeasonNumber ? (episodesData || []) : []
           }));
           console.log('Processed seasons:', seasons);
 
