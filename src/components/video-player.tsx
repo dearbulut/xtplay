@@ -67,6 +67,13 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
             enableWorker: true,
             lowLatencyMode: false,
             backBufferLength: 90,
+            xhrSetup: function(xhr) {
+              xhr.withCredentials = false;
+            },
+            maxLoadingRetry: 4,
+            manifestLoadingTimeOut: 20000,
+            manifestLoadingMaxRetry: 4,
+            manifestLoadingRetryDelay: 1000,
           });
 
           hlsInstance.loadSource(resolvedSrc);
@@ -80,21 +87,39 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
           });
 
           hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+            console.log('HLS Error:', event, data);
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.error('Network error:', data);
-                  hlsInstance?.startLoad();
+                  console.error('Network error:', data.details);
+                  if (data.response) {
+                    console.log('Response:', data.response);
+                  }
+                  // Try to recover from network error
+                  setTimeout(() => {
+                    console.log('Attempting to recover from network error...');
+                    hlsInstance?.startLoad();
+                  }, 1000);
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.error('Media error:', data);
-                  hlsInstance?.recoverMediaError();
+                  console.error('Media error:', data.details);
+                  // Try to recover from media error
+                  setTimeout(() => {
+                    console.log('Attempting to recover from media error...');
+                    hlsInstance?.recoverMediaError();
+                  }, 1000);
                   break;
                 default:
-                  console.error('Fatal error:', data);
+                  console.error('Fatal error:', data.type, data.details);
                   setError('Stream error. Please try again.');
+                  if (hlsInstance) {
+                    hlsInstance.destroy();
+                  }
                   break;
               }
+            } else {
+              // Non-fatal error
+              console.warn('Non-fatal HLS error:', data.type, data.details);
             }
           });
 

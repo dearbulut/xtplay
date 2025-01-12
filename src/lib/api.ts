@@ -79,7 +79,10 @@ export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie
   if (streamType === 'series') {
     return `${baseUrl}/series/${username}/${password}/${streamId}.${container || 'ts'}`;
   } else if (streamType === 'movie') {
-    return `${baseUrl}/movie/${username}/${password}/${streamId}.${container || 'mp4'}`;
+    // Try both extensions for movies
+    return container === 'mp4' 
+      ? `${baseUrl}/movie/${username}/${password}/${streamId}.mp4`
+      : `${baseUrl}/movie/${username}/${password}/${streamId}.m3u8`;
   } else if (streamType === 'live') {
     return `${baseUrl}/live/${username}/${password}/${streamId}.m3u8`;
   }
