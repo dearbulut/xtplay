@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
 import { Loader2, Play, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,7 @@ export function ExoPlayer({ src, poster, autoPlay = false, container = 'm3u8' }:
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const hlsRef = useRef<Hls | null>(null);
 
   useEffect(() => {
     const resolveSrc = async () => {
@@ -44,70 +46,109 @@ export function ExoPlayer({ src, poster, autoPlay = false, container = 'm3u8' }:
     if (!videoRef.current || !resolvedSrc) return;
 
     const video = videoRef.current;
+    let hls = hlsRef.current;
 
     const initializeVideo = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        video.src = resolvedSrc;
-        video.volume = volume;
-        video.muted = isMuted;
-
-        const handleCanPlay = () => {
-          console.log('Video can play');
-          setIsLoading(false);
-          if (autoPlay) {
-            video.play().catch(console.error);
+        // Always try HLS first for live streams and m3u8 files
+        if ((container === 'm3u8' || container === 'live') && Hls.isSupported()) {
+          console.log('Initializing HLS with source:', resolvedSrc);
+          
+          if (hls) {
+            hls.destroy();
           }
-        };
 
-        const handleError = () => {
-          console.error('Video error:', video.error);
-          setError('Video playback error');
-          setIsLoading(false);
-        };
+          hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 10,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 600,
+            maxBufferSize: 60 * 1000 * 1000,
+            maxBufferHole: 0.5,
+            highBufferWatchdogPeriod: 2,
+            nudgeOffset: 0.1,
+            nudgeMaxRetry: 5,
+            maxFragLookUpTolerance: 0.25,
+            liveDurationInfinity: true,
+            liveBackBufferLength: null,
+            xhrSetup: function(xhr) {
+              xhr.withCredentials = false;
+            },
+          });
 
-        const handleTimeUpdate = () => {
-          setCurrentTime(video.currentTime);
-        };
+          hlsRef.current = hls;
 
-        const handleDurationChange = () => {
-          setDuration(video.duration);
-        };
+          hls.loadSource(resolvedSrc);
+          hls.attachMedia(video);
 
-        const handlePlay = () => {
-          setIsPlaying(true);
-        };
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log('HLS manifest parsed');
+            setIsLoading(false);
+            video.volume = volume;
+            video.muted = false;
+            if (autoPlay) {
+              video.play().catch(console.error);
+            }
+          });
 
-        const handlePause = () => {
-          setIsPlaying(false);
-        };
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            console.log('HLS error:', event, data);
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.error('Network error:', data.details);
+                  hls?.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.error('Media error:', data.details);
+                  hls?.recoverMediaError();
+                  break;
+                default:
+                  console.error('Fatal error:', data.type, data.details);
+                  setError('Stream error');
+                  if (hls) {
+                    hls.destroy();
+                  }
+                  break;
+              }
+            }
+          });
+        } else {
+          // Direct playback for other formats
+          video.src = resolvedSrc;
+          video.volume = volume;
+          video.muted = false;
+          
+          const handleCanPlay = () => {
+            console.log('Video can play directly');
+            setIsLoading(false);
+            if (autoPlay) {
+              video.play().catch(console.error);
+            }
+          };
 
-        const handleVolumeChange = () => {
-          setVolume(video.volume);
-          setIsMuted(video.muted);
-        };
+          const handleError = () => {
+            console.error('Direct playback error:', video.error);
+            setError('Video playback error');
+            setIsLoading(false);
+          };
 
-        video.addEventListener('canplay', handleCanPlay);
-        video.addEventListener('error', handleError);
-        video.addEventListener('timeupdate', handleTimeUpdate);
-        video.addEventListener('durationchange', handleDurationChange);
-        video.addEventListener('play', handlePlay);
-        video.addEventListener('pause', handlePause);
-        video.addEventListener('volumechange', handleVolumeChange);
+          video.addEventListener('canplay', handleCanPlay);
+          video.addEventListener('error', handleError);
 
-        video.load();
+          video.load();
 
-        return () => {
-          video.removeEventListener('canplay', handleCanPlay);
-          video.removeEventListener('error', handleError);
-          video.removeEventListener('timeupdate', handleTimeUpdate);
-          video.removeEventListener('durationchange', handleDurationChange);
-          video.removeEventListener('play', handlePlay);
-          video.removeEventListener('pause', handlePause);
-          video.removeEventListener('volumechange', handleVolumeChange);
-        };
+          return () => {
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('error', handleError);
+          };
+        }
       } catch (error) {
         console.error('Video initialization error:', error);
         setError('Failed to initialize video player');
@@ -120,13 +161,17 @@ export function ExoPlayer({ src, poster, autoPlay = false, container = 'm3u8' }:
       if (cleanup && typeof cleanup === 'function') {
         cleanup();
       }
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
       if (video) {
         video.pause();
         video.src = '';
         video.load();
       }
     };
-  }, [resolvedSrc, autoPlay, volume, isMuted]);
+  }, [resolvedSrc, container, autoPlay, volume]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {

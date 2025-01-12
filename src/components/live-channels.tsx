@@ -357,7 +357,7 @@ export function LiveChannels() {
         {selectedChannel ? (
           <>
             <div className="rounded-lg overflow-hidden">
-              <VideoPlayer src={streamUrl} autoPlay={true} />
+              <ExoPlayer src={streamUrl} autoPlay={true} container="m3u8" />
             </div>
             <div className="flex justify-between items-center">
               <h2 className="text-xl md:text-2xl font-bold">
