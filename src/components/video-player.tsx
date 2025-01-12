@@ -42,100 +42,108 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       setError(null);
 
       try {
-        // For MKV and MP4, use direct playback
-        if (container === 'mkv' || container === 'mp4') {
-          console.log('Using direct playback for:', container);
-          video.src = resolvedSrc;
-          video.volume = 1;
-          video.muted = false;
-          
-          const handleCanPlay = () => {
-            console.log('Video can play directly');
-            setIsLoading(false);
-            if (autoPlay) {
-              video.play().catch(console.error);
-            }
-          };
+        // Always use direct playback first
+        video.src = resolvedSrc;
+        video.volume = 1;
+        video.muted = false;
 
-          const handleError = () => {
-            console.error('Direct playback error:', video.error);
+        const handleCanPlay = () => {
+          console.log('Video can play directly');
+          setIsLoading(false);
+          if (autoPlay) {
+            video.play().catch(console.error);
+          }
+        };
+
+        const handleError = () => {
+          console.error('Direct playback error:', video.error);
+          // If direct playback fails and it's not MKV/MP4, try HLS
+          if (container !== 'mkv' && container !== 'mp4' && Hls.isSupported()) {
+            initializeHLS();
+          } else {
             setError('Video playback error');
             setIsLoading(false);
-          };
+          }
+        };
 
-          video.addEventListener('canplay', handleCanPlay);
-          video.addEventListener('error', handleError);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('error', handleError);
 
-          video.load();
+        video.load();
 
-          return () => {
-            video.removeEventListener('canplay', handleCanPlay);
-            video.removeEventListener('error', handleError);
-          };
-        }
-
-        // For other formats, try HLS
-        if (Hls.isSupported()) {
-          console.log('Initializing HLS with source:', resolvedSrc);
-          hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: false,
-            backBufferLength: 90,
-            xhrSetup: function(xhr) {
-              xhr.withCredentials = false;
-            },
-            maxLoadingRetry: 4,
-            manifestLoadingTimeOut: 20000,
-            manifestLoadingMaxRetry: 4,
-            manifestLoadingRetryDelay: 1000,
-          });
-
-          hls.loadSource(resolvedSrc);
-          hls.attachMedia(video);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            console.log('HLS manifest parsed, attempting playback');
-            setIsLoading(false);
-            video.volume = 1;
-            video.muted = false;
-            if (autoPlay) {
-              video.play().catch(console.error);
-            }
-          });
-
-          hls.on(Hls.Events.ERROR, (event, data) => {
-            console.log('HLS error:', event, data);
-            if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.error('Network error:', data.details);
-                  hls?.startLoad();
-                  break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.error('Media error:', data.details);
-                  hls?.recoverMediaError();
-                  break;
-                default:
-                  console.error('Fatal error:', data.type, data.details);
-                  setError('Stream error');
-                  if (hls) {
-                    hls.destroy();
-                  }
-                  break;
-              }
-            }
-          });
-        } else {
-          // Fallback for browsers without HLS support
-          video.src = resolvedSrc;
-          video.volume = 1;
-          video.muted = false;
-          setIsLoading(false);
-        }
+        return () => {
+          video.removeEventListener('canplay', handleCanPlay);
+          video.removeEventListener('error', handleError);
+        };
       } catch (error) {
         console.error('Video initialization error:', error);
         setError('Failed to initialize video player');
       }
+    };
+
+    const initializeHLS = () => {
+      if (!Hls.isSupported()) {
+        console.error('HLS not supported');
+        setError('HLS playback not supported');
+        return;
+      }
+
+      console.log('Initializing HLS with source:', resolvedSrc);
+      hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+        xhrSetup: function(xhr) {
+          xhr.withCredentials = false;
+        },
+        maxLoadingRetry: 4,
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 4,
+        manifestLoadingRetryDelay: 1000,
+      });
+
+      hls.loadSource(resolvedSrc);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log('HLS manifest parsed');
+        setIsLoading(false);
+        video.volume = 1;
+        video.muted = false;
+        if (autoPlay) {
+          video.play().catch(console.error);
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.log('HLS error:', event, data);
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.error('Network error:', data.details);
+              if (data.details === 'manifestLoadError') {
+                // If HLS fails, try direct playback again
+                hls?.destroy();
+                video.src = resolvedSrc;
+                video.load();
+              } else {
+                hls?.startLoad();
+              }
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.error('Media error:', data.details);
+              hls?.recoverMediaError();
+              break;
+            default:
+              console.error('Fatal error:', data.type, data.details);
+              setError('Stream error');
+              if (hls) {
+                hls.destroy();
+              }
+              break;
+          }
+        }
+      });
     };
 
     const cleanup = initializeVideo();
@@ -155,13 +163,6 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
     };
   }, [resolvedSrc, container, autoPlay]);
 
-  const handleVolumeChange = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = false;
-      videoRef.current.volume = 1;
-    }
-  };
-
   return (
     <div className="relative group">
       {error ? (
@@ -178,8 +179,6 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
         controlsList="nodownload"
         preload="auto"
         muted={false}
-        onVolumeChange={handleVolumeChange}
-        onClick={handleVolumeChange}
       />
       {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
