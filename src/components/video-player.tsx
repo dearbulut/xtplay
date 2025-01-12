@@ -42,19 +42,40 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       setError(null);
 
       try {
-        // Always try direct playback first
-        console.log('Trying direct playback first');
-        video.src = resolvedSrc;
-        
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            console.log('Direct playback successful');
+        // For MKV and MP4, use direct playback
+        if (container === 'mkv' || container === 'mp4') {
+          console.log('Using direct playback for:', container);
+          video.src = resolvedSrc;
+          video.volume = 1;
+          video.muted = false;
+          
+          const handleCanPlay = () => {
+            console.log('Video can play directly');
             setIsLoading(false);
-          }).catch(() => {
-            console.log('Direct playback failed, trying HLS');
-            // If direct playback fails and it's not MKV/MP4, try HLS
-            if (container !== 'mkv' && container !== 'mp4' && Hls.isSupported()) {
+            if (autoPlay) {
+              video.play().catch(console.error);
+            }
+          };
+
+          const handleError = () => {
+            console.error('Direct playback error:', video.error);
+            setError('Video playback error');
+            setIsLoading(false);
+          };
+
+          video.addEventListener('canplay', handleCanPlay);
+          video.addEventListener('error', handleError);
+
+          video.load();
+
+          return () => {
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('error', handleError);
+          };
+        }
+
+        // For other formats, try HLS
+        if (Hls.isSupported()) {
           console.log('Initializing HLS with source:', resolvedSrc);
           hls = new Hls({
             enableWorker: true,
@@ -75,10 +96,11 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             console.log('HLS manifest parsed, attempting playback');
             setIsLoading(false);
-            video.play().catch(error => {
-              console.error('HLS playback failed:', error);
-              initializeDirectPlayback();
-            });
+            video.volume = 1;
+            video.muted = false;
+            if (autoPlay) {
+              video.play().catch(console.error);
+            }
           });
 
           hls.on(Hls.Events.ERROR, (event, data) => {
@@ -87,11 +109,7 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
                   console.error('Network error:', data.details);
-                  if (data.details === 'manifestLoadTimeOut') {
-                    initializeDirectPlayback();
-                  } else {
-                    hls?.startLoad();
-                  }
+                  hls?.startLoad();
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
                   console.error('Media error:', data.details);
@@ -99,54 +117,25 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
                   break;
                 default:
                   console.error('Fatal error:', data.type, data.details);
-                  initializeDirectPlayback();
+                  setError('Stream error');
+                  if (hls) {
+                    hls.destroy();
+                  }
                   break;
               }
             }
           });
-            } else {
-              console.log('Using direct playback only');
-              setIsLoading(false);
-            }
-          });
+        } else {
+          // Fallback for browsers without HLS support
+          video.src = resolvedSrc;
+          video.volume = 1;
+          video.muted = false;
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Video initialization error:', error);
         setError('Failed to initialize video player');
       }
-    };
-
-    const initializeDirectPlayback = () => {
-      console.log('Initializing direct playback');
-      if (hls) {
-        hls.destroy();
-        hls = null;
-      }
-
-      const handleCanPlay = () => {
-        console.log('Video can play directly');
-        setIsLoading(false);
-        if (autoPlay) {
-          video.play().catch(console.error);
-        }
-      };
-
-      const handleError = () => {
-        console.error('Direct playback error:', video.error);
-        setError('Video playback error');
-        setIsLoading(false);
-      };
-
-      video.addEventListener('canplay', handleCanPlay);
-      video.addEventListener('error', handleError);
-
-      video.src = resolvedSrc;
-      video.load();
-
-      return () => {
-        video.removeEventListener('canplay', handleCanPlay);
-        video.removeEventListener('error', handleError);
-      };
     };
 
     const cleanup = initializeVideo();
@@ -166,6 +155,13 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
     };
   }, [resolvedSrc, container, autoPlay]);
 
+  const handleVolumeChange = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      videoRef.current.volume = 1;
+    }
+  };
+
   return (
     <div className="relative group">
       {error ? (
@@ -182,6 +178,8 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
         controlsList="nodownload"
         preload="auto"
         muted={false}
+        onVolumeChange={handleVolumeChange}
+        onClick={handleVolumeChange}
       />
       {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">

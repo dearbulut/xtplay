@@ -102,57 +102,73 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         // Log raw data for debugging
         console.log('Raw series data:', seriesData);
         
-        if (seriesData && typeof seriesData === 'object') {
-          // If we have episodes object
-          if (seriesData.episodes && typeof seriesData.episodes === 'object') {
-            console.log('Found episodes object:', seriesData.episodes);
-            // Filter out non-season keys and convert to array
-            seasons = Object.entries(seriesData.episodes)
-              .filter(([key]) => !isNaN(parseInt(key)))
-              .map(([seasonNum, episodes]) => ({
-                season_number: parseInt(seasonNum),
-                name: `Season ${seasonNum}`,
-                episodes: Array.isArray(episodes) ? episodes : []
-              }))
-              .sort((a, b) => a.season_number - b.season_number);
-          }
-        }
-        
-        // If no seasons found, try to extract from episode titles
-        if (seasons.length === 0 && Array.isArray(seriesData)) {
-          console.log('Trying to extract seasons from episode titles');
-          const seasonSet = new Set();
+        // Function to extract season number from title
+        const getSeasonFromTitle = (title: string) => {
+          const match = title?.match(/[Ss](\d+)[Ee]\d+/);
+          return match ? parseInt(match[1]) : null;
+        };
+
+        // Function to extract episode number from title
+        const getEpisodeFromTitle = (title: string) => {
+          const match = title?.match(/[Ss]\d+[Ee](\d+)/);
+          return match ? parseInt(match[1]) : null;
+        };
+
+        if (Array.isArray(seriesData)) {
+          // Group episodes by season
+          const episodesBySeasons = new Map<number, any[]>();
           
-          // Extract season numbers from episode titles
           seriesData.forEach(episode => {
-            const match = episode.title?.match(/S(\d+)/i);
-            if (match) {
-              seasonSet.add(parseInt(match[1]));
+            const seasonNum = getSeasonFromTitle(episode.title);
+            if (seasonNum) {
+              if (!episodesBySeasons.has(seasonNum)) {
+                episodesBySeasons.set(seasonNum, []);
+              }
+              episodesBySeasons.get(seasonNum)?.push({
+                ...episode,
+                episode_num: getEpisodeFromTitle(episode.title) || 0
+              });
             }
           });
-          
-          if (seasonSet.size > 0) {
-            seasons = Array.from(seasonSet)
-              .map(seasonNum => ({
-                season_number: seasonNum,
-                name: `Season ${seasonNum}`,
-                episodes: seriesData.filter(episode => {
-                  const match = episode.title?.match(/S(\d+)/i);
-                  return match && parseInt(match[1]) === seasonNum;
-                })
-              }))
-              .sort((a, b) => a.season_number - b.season_number);
-          }
+
+          // Convert map to array and sort episodes
+          seasons = Array.from(episodesBySeasons.entries())
+            .map(([seasonNum, episodes]) => ({
+              season_number: seasonNum,
+              name: `Season ${seasonNum}`,
+              episodes: episodes.sort((a, b) => a.episode_num - b.episode_num)
+            }))
+            .sort((a, b) => a.season_number - b.season_number);
+        } else if (seriesData && typeof seriesData === 'object' && seriesData.episodes) {
+          // Handle episodes object format
+          seasons = Object.entries(seriesData.episodes)
+            .filter(([key]) => !isNaN(parseInt(key)))
+            .map(([seasonNum, episodes]) => ({
+              season_number: parseInt(seasonNum),
+              name: `Season ${seasonNum}`,
+              episodes: Array.isArray(episodes) ? episodes : []
+            }))
+            .sort((a, b) => a.season_number - b.season_number);
         }
-        
-        // If still no seasons found, create default season
-        if (seasons.length === 0) {
-          console.log('No seasons found, creating default season');
-          seasons = [{
-            season_number: 1,
-            name: 'Season 1',
-            episodes: Array.isArray(seriesData) ? seriesData : []
-          }];
+
+        // If no seasons found, try to create seasons from episode list
+        if (seasons.length === 0 && Array.isArray(seriesData)) {
+          const maxSeasonNum = Math.max(...seriesData.map(episode => 
+            getSeasonFromTitle(episode.title) || 1
+          ));
+
+          seasons = Array.from({ length: maxSeasonNum }, (_, i) => ({
+            season_number: i + 1,
+            name: `Season ${i + 1}`,
+            episodes: seriesData.filter(episode => {
+              const seasonNum = getSeasonFromTitle(episode.title);
+              return seasonNum === i + 1;
+            }).sort((a, b) => {
+              const aNum = getEpisodeFromTitle(a.title) || 0;
+              const bNum = getEpisodeFromTitle(b.title) || 0;
+              return aNum - bNum;
+            })
+          }));
         }
         
         console.log('Processed seasons:', seasons);
