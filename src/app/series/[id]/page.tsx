@@ -96,55 +96,63 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         const seriesData = await fetchFromApi('get_series_seasons', { series_id: params.id });
         console.log('Series data:', JSON.stringify(seriesData, null, 2));
 
-        // Extract seasons and episodes
-        let seasons = [];
-        if (seriesData && typeof seriesData === 'object') {
-          if (Array.isArray(seriesData)) {
-            // If API returns array of seasons
-            seasons = seriesData.map(season => ({
-              season_number: parseInt(season.season_number),
-              name: `Season ${season.season_number}`,
-              episodes: []
-            }));
-          } else if (seriesData.episodes && typeof seriesData.episodes === 'object') {
-            // If API returns episodes object
-            seasons = Object.entries(seriesData.episodes).map(([seasonNum, episodes]) => ({
-              season_number: parseInt(seasonNum),
-              name: `Season ${seasonNum}`,
-              episodes: Array.isArray(episodes) ? episodes : []
-            }));
-          }
+        // Process series data to extract seasons and episodes
+        console.log('Processing series data...');
+        
+        // Group episodes by season using regex pattern from titles
+        const episodesBySeasons = new Map<number, any[]>();
+        
+        if (Array.isArray(seriesData)) {
+          seriesData.forEach(episode => {
+            // Extract season number from title (e.g., "S01 E01" or "Season 1")
+            const seasonMatch = episode.title?.match(/S(\d+)\s*E\d+|Season\s*(\d+)/i);
+            if (seasonMatch) {
+              const seasonNum = parseInt(seasonMatch[1] || seasonMatch[2]);
+              if (!episodesBySeasons.has(seasonNum)) {
+                episodesBySeasons.set(seasonNum, []);
+              }
+              episodesBySeasons.get(seasonNum)?.push(episode);
+            }
+          });
         }
         
-        // Sort seasons by number
-        seasons = seasons.sort((a, b) => a.season_number - b.season_number);
+        // Convert map to array of seasons
+        const seasons = Array.from(episodesBySeasons.entries())
+          .map(([seasonNum, episodes]) => ({
+            season_number: seasonNum,
+            name: `Season ${seasonNum}`,
+            episodes: episodes.sort((a, b) => {
+              // Sort episodes by episode number
+              const aMatch = a.title?.match(/E(\d+)/i);
+              const bMatch = b.title?.match(/E(\d+)/i);
+              const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+              const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+              return aNum - bNum;
+            })
+          }))
+          .sort((a, b) => a.season_number - b.season_number);
+        
         console.log('Processed seasons:', seasons);
 
         if (seasons.length > 0) {
-            // Get first season
-            const firstSeason = seasons[0];
-            console.log('First season:', firstSeason);
+          // Get first season
+          const firstSeason = seasons[0];
+          console.log('First season:', firstSeason);
 
-            // 4. Combine all data
-            const fullSeriesData = {
-              ...seriesInfo,
-              seasons: seasons
-            };
+          // 4. Combine all data
+          const fullSeriesData = {
+            ...seriesInfo,
+            seasons: seasons
+          };
 
-            console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
-            setSeries(fullSeriesData);
-            setSelectedSeason(firstSeasonNumber);
+          console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
+          setSeries(fullSeriesData);
+          setSelectedSeason(firstSeason.season_number);
 
-            // Select first episode if available
-            const firstSeasonEpisodes = await fetchFromApi('get_series_episodes', { 
-              series_id: params.id,
-              season_number: String(firstSeasonNumber)
-            });
-            console.log('First season episodes:', JSON.stringify(firstSeasonEpisodes, null, 2));
-
-            if (firstSeasonEpisodes && Array.isArray(firstSeasonEpisodes) && firstSeasonEpisodes.length > 0) {
-              setSelectedEpisode(firstSeasonEpisodes[0]);
-            }
+          // Select first episode if available
+          if (firstSeason.episodes.length > 0) {
+            setSelectedEpisode(firstSeason.episodes[0]);
+          }
         } else {
           setSeries({
             ...seriesInfo,

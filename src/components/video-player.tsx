@@ -223,6 +223,7 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
         className="w-full aspect-video bg-black"
         poster={poster}
         playsInline
+        controls
       />
       {isBuffering && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
