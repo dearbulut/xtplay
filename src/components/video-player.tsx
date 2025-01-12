@@ -42,14 +42,19 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       setError(null);
 
       try {
-        // For MKV and MP4, try direct playback first
-        if (container === 'mkv' || container === 'mp4') {
-          console.log('Using direct playback for:', container);
-          return initializeDirectPlayback();
-        }
-
-        // For other formats, try HLS first
-        if (Hls.isSupported()) {
+        // Always try direct playback first
+        console.log('Trying direct playback first');
+        video.src = resolvedSrc;
+        
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('Direct playback successful');
+            setIsLoading(false);
+          }).catch(() => {
+            console.log('Direct playback failed, trying HLS');
+            // If direct playback fails and it's not MKV/MP4, try HLS
+            if (container !== 'mkv' && container !== 'mp4' && Hls.isSupported()) {
           console.log('Initializing HLS with source:', resolvedSrc);
           hls = new Hls({
             enableWorker: true,
@@ -99,12 +104,15 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
               }
             }
           });
-        } else {
-          initializeDirectPlayback();
+            } else {
+              console.log('Using direct playback only');
+              setIsLoading(false);
+            }
+          });
         }
       } catch (error) {
         console.error('Video initialization error:', error);
-        initializeDirectPlayback();
+        setError('Failed to initialize video player');
       }
     };
 

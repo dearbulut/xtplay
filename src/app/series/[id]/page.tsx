@@ -214,11 +214,12 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
       );
     }
 
-    return currentSeason.episodes.map((episode: any) => {
+    return currentSeason.episodes.map((episode: any, index: number) => {
       console.log('Rendering episode:', episode);
+      const episodeKey = episode.id || `episode-${index}`;
       return (
         <button
-          key={episode.id}
+          key={episodeKey}
           onClick={() => setSelectedEpisode(episode)}
           className={`flex flex-col bg-card rounded-lg overflow-hidden hover:ring-2 ring-primary transition-all ${
             selectedEpisode?.id === episode.id ? 'ring-2' : ''
@@ -315,7 +316,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
 
         <div className="space-y-4">
           <div className="flex gap-2 overflow-x-auto pb-4">
-            {series.seasons?.map((season: any) => (
+            {series.seasons?.map((season: any, index: number) => (
               <button
                 key={season.season_number}
                 onClick={() => handleSeasonChange(season.season_number)}
@@ -330,7 +331,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {seasonLoading ? (
-              Array.from({ length: 10 }).map((_, index) => (
+              Array.from({ length: 10 }).map((_, index: number) => (
                 <div key={index} className="flex flex-col bg-card rounded-lg overflow-hidden animate-pulse">
                   <div className="relative aspect-video bg-secondary" />
                   <div className="p-3">
