@@ -35,13 +35,6 @@ export async function fetchFromApi(action: string, params: Record<string, string
 
   // Construct the URL based on the action type
   let url;
-  // Actions that require series_id
-  const seriesActions = ['get_series_info', 'get_series_seasons', 'get_series_episodes'];
-  
-  if (seriesActions.some(a => action.startsWith(a)) && !params.series_id) {
-    throw new Error('Missing series_id parameter');
-  }
-
   if (action === 'get_series_list') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series`;
   } else if (action === 'get_categories') {
@@ -49,9 +42,9 @@ export async function fetchFromApi(action: string, params: Record<string, string
   } else if (action === 'get_series_info') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}`;
   } else if (action === 'get_series_seasons') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}`;
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_seasons&series_id=${params.series_id}`;
   } else if (action === 'get_series_episodes') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}&season_id=${params.season_number}`;
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_episodes&series_id=${params.series_id}&season_id=${params.season_number}`;
   } else {
     url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
   }
