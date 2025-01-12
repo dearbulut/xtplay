@@ -79,10 +79,8 @@ export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie
   if (streamType === 'series') {
     return `${baseUrl}/series/${username}/${password}/${streamId}.${container || 'ts'}`;
   } else if (streamType === 'movie') {
-    // Try both extensions for movies
-    return container === 'mp4' 
-      ? `${baseUrl}/movie/${username}/${password}/${streamId}.mp4`
-      : `${baseUrl}/movie/${username}/${password}/${streamId}.m3u8`;
+    // For movies, always use direct stream URL
+    return `${baseUrl}/movie/${username}/${password}/${streamId}`;
   } else if (streamType === 'live') {
     return `${baseUrl}/live/${username}/${password}/${streamId}.m3u8`;
   }
