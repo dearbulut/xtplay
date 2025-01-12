@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { fetchFromApi, getStreamUrl } from '@/lib/api';
-import { VideoPlayer } from '@/components/video-player';
+import { ExoPlayer } from '@/components/exo-player';
 import { Film } from 'lucide-react';
 import Image from 'next/image';
 
@@ -31,54 +31,50 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         return;
       }
 
-      try {
-        // Fetch episodes for the selected season
-        console.log(`Fetching episodes for series ${params.id}, season ${seasonNumber}`);
-        const episodesData = await fetchFromApi('get_series_episodes', { 
-          series_id: params.id,
-          season_number: String(seasonNumber)
-        });
-        console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
+      // Fetch episodes for the selected season
+      console.log(`Fetching episodes for series ${params.id}, season ${seasonNumber}`);
+      const episodesData = await fetchFromApi('get_series_episodes', { 
+        series_id: params.id,
+        season_number: String(seasonNumber)
+      });
+      console.log('Episodes data:', JSON.stringify(episodesData, null, 2));
 
-        // Update series data with new episodes
-        setSeries(prev => {
-          const updatedSeries = {
-            ...prev,
-            seasons: prev.seasons.map(season => {
-              if (season.season_number === seasonNumber) {
-                return {
-                  ...season,
-                  episodes: Array.isArray(episodesData) ? episodesData : []
-                };
-              }
-              return season;
-            })
-          };
-          console.log('Updated series data:', JSON.stringify(updatedSeries, null, 2));
-          return updatedSeries;
-        });
+      // Update series data with new episodes
+      setSeries(prev => {
+        const updatedSeries = {
+          ...prev,
+          seasons: prev.seasons.map(season => {
+            if (season.season_number === seasonNumber) {
+              return {
+                ...season,
+                episodes: Array.isArray(episodesData) ? episodesData : []
+              };
+            }
+            return season;
+          })
+        };
+        console.log('Updated series data:', JSON.stringify(updatedSeries, null, 2));
+        return updatedSeries;
+      });
 
-        // Select first episode if available
-        if (Array.isArray(episodesData) && episodesData.length > 0) {
-          console.log('Setting first episode:', episodesData[0]);
-          setSelectedEpisode(episodesData[0]);
-        } else {
-          console.log('No episodes available for season:', seasonNumber);
-          setSelectedEpisode(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch episodes:', error);
+      // Select first episode if available
+      if (Array.isArray(episodesData) && episodesData.length > 0) {
+        console.log('Setting first episode:', episodesData[0]);
+        setSelectedEpisode(episodesData[0]);
+      } else {
+        console.log('No episodes available for season:', seasonNumber);
         setSelectedEpisode(null);
       }
     } catch (error) {
-      console.error('Failed to fetch season episodes:', error);
+      console.error('Failed to fetch episodes:', error);
+      setSelectedEpisode(null);
     } finally {
       setSeasonLoading(false);
     }
   };
 
   useEffect(() => {
-    async function fetchData() {
+    const loadSeriesData = async () => {
       try {
         if (!params.id) {
           console.error('No series ID provided');
@@ -87,11 +83,6 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
 
         // 1. Fetch series info
         console.log('Fetching series info for ID:', params.id);
-        const seriesInfo = await fetchFromApi('get_series_info', { series_id: params.id });
-        console.log('Series info:', JSON.stringify(seriesInfo, null, 2));
-
-        // 2. Fetch series data with episodes
-        console.log('Fetching series data...');
         const seriesData = await fetchFromApi('get_series_seasons', { series_id: params.id });
         console.log('Series data:', JSON.stringify(seriesData, null, 2));
 
@@ -118,44 +109,29 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         }
 
         console.log('Created seasons:', seasons);
-        }
-        
-        console.log('Processed seasons:', seasons);
 
-        console.log('Processed seasons:', seasons);
+        // Combine all data
+        const fullSeriesData = {
+          ...seriesData,
+          seasons: seasons
+        };
 
-        if (seasons.length > 0) {
-          // Get first season
-          const firstSeason = seasons[0];
-          console.log('First season:', firstSeason);
+        console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
+        setSeries(fullSeriesData);
+        setSelectedSeason(1);
 
-          // 3. Combine all data
-          const fullSeriesData = {
-            ...seriesInfo,
-            seasons: seasons
-          };
-
-          console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
-          setSeries(fullSeriesData);
-          setSelectedSeason(firstSeason.season_number);
-
-          // Select first episode if available
-          if (firstSeason.episodes.length > 0) {
-            setSelectedEpisode(firstSeason.episodes[0]);
-          }
-        } else {
-          setSeries({
-            ...seriesInfo,
-            seasons: []
-          });
+        // Select first episode if available
+        if (seasons[0].episodes.length > 0) {
+          setSelectedEpisode(seasons[0].episodes[0]);
         }
       } catch (error) {
         console.error('Failed to fetch series data:', error);
       } finally {
         setLoading(false);
       }
-    }
-    fetchData();
+    };
+
+    loadSeriesData();
   }, [params.id]);
 
   if (loading || !series) {
@@ -267,7 +243,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
       <div className="space-y-4">
         {selectedEpisode ? (
           <div className="rounded-lg overflow-hidden">
-            <VideoPlayer
+            <ExoPlayer
               src={getStreamUrl(selectedEpisode.id, 'series', selectedEpisode.container_extension)}
               container={selectedEpisode.container_extension || 'ts'}
               poster={selectedEpisode.info?.movie_image || series.cover}
@@ -296,7 +272,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {seasonLoading ? (
-              Array.from({ length: 10 }).map((_, index: number) => (
+              Array.from({ length: 10 }).map((_, index) => (
                 <div key={index} className="flex flex-col bg-card rounded-lg overflow-hidden animate-pulse">
                   <div className="relative aspect-video bg-secondary" />
                   <div className="p-3">

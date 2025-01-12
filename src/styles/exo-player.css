@@ -1,0 +1,153 @@
+/* ExoPlayer styles */
+.exo-player-container {
+  position: relative;
+  width: 100%;
+  background-color: black;
+}
+
+.exo-player-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Progress bar */
+.exo-player-progress {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  width: 100%;
+  cursor: pointer;
+  outline: none;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.exo-player-progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.exo-player-progress::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.exo-player-progress::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.exo-player-progress::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Volume slider */
+.exo-player-volume {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  width: 80px;
+  cursor: pointer;
+  outline: none;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.exo-player-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.exo-player-volume::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.exo-player-volume::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.exo-player-volume::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Controls container */
+.exo-player-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.exo-player-container:hover .exo-player-controls {
+  opacity: 1;
+}
+
+/* Control buttons */
+.exo-player-button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.exo-player-button:hover {
+  color: #0ea5e9;
+}
+
+/* Time display */
+.exo-player-time {
+  color: white;
+  font-size: 14px;
+  font-family: monospace;
+}
+
+/* Loading spinner */
+.exo-player-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+}
+
+/* Error message */
+.exo-player-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+}

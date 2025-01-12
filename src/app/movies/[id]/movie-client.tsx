@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Film, Star, Video } from 'lucide-react';
-import { VideoPlayer } from '@/components/video-player';
+import { ExoPlayer } from '@/components/exo-player';
 
 interface MovieInfo {
   movie_image: string;
@@ -49,11 +49,11 @@ export default function MovieClient({ movieDetails }: { movieDetails: MovieDetai
   return (
     <div className="space-y-6">
       <div className="relative aspect-video rounded-lg overflow-hidden">
-        <VideoPlayer
+        <ExoPlayer
           src={streamUrl}
           poster={movieDetails.info.movie_image}
           autoPlay={false}
-          isDirectMp4={true}
+          container={movieDetails.movie_data.container_extension as 'm3u8' | 'ts' | 'mp4' | 'mkv'}
         />
       </div>
 
