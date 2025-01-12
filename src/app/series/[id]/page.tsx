@@ -89,21 +89,36 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         console.log('Series info type:', typeof seriesData);
         console.log('Series info keys:', Object.keys(seriesData));
 
-        // Extract info and episodes
-        const info = seriesData.info || seriesData;
-        const episodes = seriesData.episodes || {};
-        console.log('Series info:', info);
+        // Extract episodes from series info
+        console.log('Processing series info...');
+        const episodes = seriesData.episodes || [];
         console.log('Episodes:', episodes);
 
-        // Fetch seasons
-        console.log('Fetching seasons...');
-        const seasonsData = await fetchFromApi('get_series_seasons', { series_id: params.id });
-        console.log('Seasons data:', seasonsData);
+        // Extract season numbers from episode titles
+        const seasonSet = new Set<number>();
+        episodes.forEach((episode: any) => {
+          // Try to extract season number from title (e.g., "S01E01" or "Season 1")
+          const seasonMatch = episode.title?.match(/S(\d+)E\d+|Season (\d+)/i);
+          if (seasonMatch) {
+            const seasonNum = parseInt(seasonMatch[1] || seasonMatch[2]);
+            seasonSet.add(seasonNum);
+          }
+        });
 
-        // Get available seasons
-        const seasonNumbers = Array.isArray(seasonsData) ? 
-          seasonsData.map(s => s.season_number) : 
-          [1]; // Default to season 1 if no seasons data
+        // If no season numbers found in titles, try to use episode season numbers
+        if (seasonSet.size === 0) {
+          episodes.forEach((episode: any) => {
+            if (episode.season_number) {
+              seasonSet.add(parseInt(episode.season_number));
+            }
+          });
+        }
+
+        // If still no seasons found, default to season 1
+        const seasonNumbers = seasonSet.size > 0 
+          ? Array.from(seasonSet).sort((a, b) => a - b)
+          : [1];
+        
         console.log('Available seasons:', seasonNumbers);
 
         if (seasonNumbers.length > 0) {
@@ -119,12 +134,25 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           });
           console.log('Episodes data:', episodesData);
 
-          // Create seasons array
-          const seasons = seasonNumbers.map(seasonNum => ({
-            season_number: seasonNum,
-            name: `Season ${seasonNum}`,
-            episodes: seasonNum === firstSeasonNumber ? (episodesData || []) : []
-          }));
+          // Group episodes by season
+          const seasons = seasonNumbers.map(seasonNum => {
+            const seasonEpisodes = episodes.filter((episode: any) => {
+              // Try to match season from title
+              const seasonMatch = episode.title?.match(/S(\d+)E\d+|Season (\d+)/i);
+              if (seasonMatch) {
+                const epSeasonNum = parseInt(seasonMatch[1] || seasonMatch[2]);
+                return epSeasonNum === seasonNum;
+              }
+              // Fallback to season_number if available
+              return episode.season_number && parseInt(episode.season_number) === seasonNum;
+            });
+
+            return {
+              season_number: seasonNum,
+              name: `Season ${seasonNum}`,
+              episodes: seasonEpisodes
+            };
+          });
           console.log('Processed seasons:', seasons);
 
           // Combine all data
