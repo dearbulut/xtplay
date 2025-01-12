@@ -17,8 +17,8 @@ export function SeriesList() {
     async function fetchData() {
       try {
         const [categoriesData, seriesData] = await Promise.all([
-          fetchFromApi('get_series_categories'),
-          fetchFromApi('get_series')
+          fetchFromApi('get_categories'),
+          fetchFromApi('get_series_list')
         ]);
         setCategories(categoriesData);
         setSeries(seriesData);
