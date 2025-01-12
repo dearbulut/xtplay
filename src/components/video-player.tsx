@@ -156,17 +156,13 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
         ref={videoRef}
         className="w-full aspect-video bg-black"
         poster={poster}
-        crossOrigin="anonymous"
         playsInline
         controls
         controlsList="nodownload"
-      >
-        <source src={resolvedSrc || undefined} type={
-          container === 'm3u8' ? 'application/x-mpegURL' :
-          container === 'mp4' ? 'video/mp4' :
-          container === 'mkv' ? 'video/x-matroska' :
-          'video/mp4'
-        } />
+        preload="auto"
+        muted={false}
+        autoPlay={autoPlay}
+      />
       </video>
       {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">

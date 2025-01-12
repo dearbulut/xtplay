@@ -91,12 +91,39 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         const seriesData = await fetchFromApi('get_series_seasons', { series_id: params.id });
         console.log('Series data:', JSON.stringify(seriesData, null, 2));
 
-        // Extract seasons from episodes object
-        const seasons = Object.keys(seriesData.episodes || {}).map(seasonNum => ({
-          season_number: parseInt(seasonNum),
-          name: `Season ${seasonNum}`,
-          episodes: seriesData.episodes[seasonNum] || []
-        })).sort((a, b) => a.season_number - b.season_number);
+        // Process series data to extract seasons
+        let seasons = [];
+        if (seriesData && typeof seriesData === 'object') {
+          // If we have info property, it's series info
+          if (seriesData.info) {
+            // Get total seasons from info
+            const totalSeasons = seriesData.info.episode_run_time || 1;
+            seasons = Array.from({ length: totalSeasons }, (_, i) => ({
+              season_number: i + 1,
+              name: `Season ${i + 1}`,
+              episodes: []
+            }));
+          }
+          // If we have episodes object
+          else if (seriesData.episodes && typeof seriesData.episodes === 'object') {
+            seasons = Object.entries(seriesData.episodes).map(([seasonNum, episodes]) => ({
+              season_number: parseInt(seasonNum),
+              name: `Season ${seasonNum}`,
+              episodes: Array.isArray(episodes) ? episodes : []
+            }));
+          }
+          // If we have an array, it might be seasons
+          else if (Array.isArray(seriesData)) {
+            seasons = seriesData.map((season, index) => ({
+              season_number: season.season_number || index + 1,
+              name: `Season ${season.season_number || index + 1}`,
+              episodes: []
+            }));
+          }
+        }
+        
+        // Sort seasons by number
+        seasons = seasons.sort((a, b) => a.season_number - b.season_number);
 
         console.log('Processed seasons:', seasons);
 
