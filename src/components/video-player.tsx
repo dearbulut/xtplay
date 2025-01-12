@@ -48,87 +48,78 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
     let hlsInstance: Hls | null = null;
 
     const initializeVideo = () => {
-      if (container === 'mp4' || container === 'ts') {
-        // Direct video playback
+      // Try direct playback first
+      try {
         video.src = resolvedSrc;
-        setHls(null);
-        video.onerror = () => {
-          console.error('Video error:', video.error);
-          setError('Failed to load video');
+        video.load();
+        video.play().then(() => {
           setIsBuffering(false);
-        };
-      } else if (container === 'm3u8') {
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          // Native HLS support (Safari)
-          video.src = resolvedSrc;
-        } else if (Hls.isSupported()) {
-          // HLS.js support
-          hlsInstance = new Hls({
-            enableWorker: true,
-            lowLatencyMode: false,
-            backBufferLength: 90,
-            xhrSetup: function(xhr) {
-              xhr.withCredentials = false;
-            },
-            maxLoadingRetry: 4,
-            manifestLoadingTimeOut: 20000,
-            manifestLoadingMaxRetry: 4,
-            manifestLoadingRetryDelay: 1000,
-          });
+          setIsPlaying(true);
+        }).catch((error) => {
+          console.log('Direct playback failed, trying HLS...', error);
+          
+          // If direct playback fails, try HLS
+          if (Hls.isSupported()) {
+            hlsInstance = new Hls({
+              enableWorker: true,
+              lowLatencyMode: false,
+              backBufferLength: 90,
+              xhrSetup: function(xhr) {
+                xhr.withCredentials = false;
+              },
+              maxLoadingRetry: 4,
+              manifestLoadingTimeOut: 20000,
+              manifestLoadingMaxRetry: 4,
+              manifestLoadingRetryDelay: 1000,
+            });
 
-          hlsInstance.loadSource(resolvedSrc);
-          hlsInstance.attachMedia(video);
+            hlsInstance.loadSource(resolvedSrc);
+            hlsInstance.attachMedia(video);
 
-          hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-            setIsBuffering(false);
-            if (autoPlay) {
-              video.play().catch(console.error);
-            }
-          });
-
-          hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-            console.log('HLS Error:', event, data);
-            if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.error('Network error:', data.details);
-                  if (data.response) {
-                    console.log('Response:', data.response);
-                  }
-                  // Try to recover from network error
-                  setTimeout(() => {
-                    console.log('Attempting to recover from network error...');
-                    hlsInstance?.startLoad();
-                  }, 1000);
-                  break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.error('Media error:', data.details);
-                  // Try to recover from media error
-                  setTimeout(() => {
-                    console.log('Attempting to recover from media error...');
-                    hlsInstance?.recoverMediaError();
-                  }, 1000);
-                  break;
-                default:
-                  console.error('Fatal error:', data.type, data.details);
-                  setError('Stream error. Please try again.');
-                  if (hlsInstance) {
-                    hlsInstance.destroy();
-                  }
-                  break;
+            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+              setIsBuffering(false);
+              if (autoPlay) {
+                video.play().catch(console.error);
               }
-            } else {
-              // Non-fatal error
-              console.warn('Non-fatal HLS error:', data.type, data.details);
-            }
-          });
+            });
 
-          setHls(hlsInstance);
-        } else {
-          setError('HLS playback not supported');
-        }
-      } else {
-        setError('Unsupported video format');
+            hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+              console.log('HLS Error:', event, data);
+              if (data.fatal) {
+                switch (data.type) {
+                  case Hls.ErrorTypes.NETWORK_ERROR:
+                    console.error('Network error:', data.details);
+                    if (data.response) {
+                      console.log('Response:', data.response);
+                    }
+                    hlsInstance?.startLoad();
+                    break;
+                  case Hls.ErrorTypes.MEDIA_ERROR:
+                    console.error('Media error:', data.details);
+                    hlsInstance?.recoverMediaError();
+                    break;
+                  default:
+                    console.error('Fatal error:', data.type, data.details);
+                    setError('Stream error. Please try again.');
+                    if (hlsInstance) {
+                      hlsInstance.destroy();
+                    }
+                    break;
+                }
+              }
+            });
+
+            setHls(hlsInstance);
+          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Native HLS support (Safari)
+            video.src = resolvedSrc;
+          } else {
+            setError('Video playback not supported');
+          }
+        });
+      } catch (error) {
+        console.error('Video initialization error:', error);
+        setError('Failed to initialize video player');
       }
     };
 
@@ -151,6 +142,11 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       setCurrentTime(0);
     };
     const handleVolumeChange = () => setVolume(video.volume);
+    const handleError = () => {
+      console.error('Video error:', video.error);
+      setError('Video playback error');
+      setIsBuffering(false);
+    };
 
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('playing', handlePlaying);
@@ -160,6 +156,7 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
     video.addEventListener('pause', handlePause);
     video.addEventListener('ended', handleEnded);
     video.addEventListener('volumechange', handleVolumeChange);
+    video.addEventListener('error', handleError);
 
     if (autoPlay) {
       video.play().catch(console.error);
@@ -179,9 +176,10 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
         video.removeEventListener('pause', handlePause);
         video.removeEventListener('ended', handleEnded);
         video.removeEventListener('volumechange', handleVolumeChange);
+        video.removeEventListener('error', handleError);
       }
     };
-  }, [resolvedSrc, container, autoPlay]);
+  }, [resolvedSrc, autoPlay]);
 
   const handlePlayPause = () => {
     if (!videoRef.current) return;

@@ -25,7 +25,7 @@ export default function MovieDetailsComponent({ movieId }: MovieDetailsComponent
           throw new Error('Invalid movie data received from API');
         }
         
-        const streamUrl = await getStreamUrl(movie.movie_data.stream_id, "movie");
+        const streamUrl = await getStreamUrl(movie.movie_data.stream_id, "movie", movie.movie_data.container_extension);
         
         setMovieDetails({
           ...movie,

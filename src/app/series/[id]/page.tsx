@@ -129,19 +129,27 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             const fullSeriesData = {
               ...seriesInfo,
               seasons: seasons
+            };
+
+            console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
+            setSeries(fullSeriesData);
+            setSelectedSeason(firstSeasonNumber);
+
+            // Select first episode if available
+            const firstSeasonEpisodes = await fetchFromApi('get_series_episodes', { 
+              series_id: params.id,
+              season_number: String(firstSeasonNumber)
+            });
+            console.log('First season episodes:', JSON.stringify(firstSeasonEpisodes, null, 2));
+
+            if (firstSeasonEpisodes && Array.isArray(firstSeasonEpisodes) && firstSeasonEpisodes.length > 0) {
+              setSelectedEpisode(firstSeasonEpisodes[0]);
             }
-          };
-
-          console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));
-          setSeries(fullSeriesData);
-          setSelectedSeason(firstSeasonNumber);
-
-          // Select first episode if available
-          if (episodesData.episodes?.length > 0) {
-            setSelectedEpisode(episodesData.episodes[0]);
-          }
         } else {
-          setSeries(seriesInfo);
+          setSeries({
+            ...seriesInfo,
+            seasons: []
+          });
         }
       } catch (error) {
         console.error('Failed to fetch series data:', error);
