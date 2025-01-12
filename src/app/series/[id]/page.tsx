@@ -86,6 +86,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             const fullSeriesData = {
               ...seriesInfo,
               seasons: seasons
+            }
           };
 
           console.log('Full series data:', JSON.stringify(fullSeriesData, null, 2));

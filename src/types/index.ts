@@ -36,6 +36,5 @@ export interface VideoPlayerProps {
   src: string | Promise<string>;
   poster?: string;
   autoPlay?: boolean;
-  isDirectMp4?: boolean;
   container?: 'm3u8' | 'ts' | 'mp4';
 }
