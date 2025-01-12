@@ -1,24 +1,24 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Plyr from 'plyr';
 import Hls from 'hls.js';
-import { VideoControls } from './video-controls';
 import { Loader2 } from 'lucide-react';
-import { VideoPlayerProps } from '@/types';
+import 'plyr/dist/plyr.css';
+
+interface VideoPlayerProps {
+  src: string | Promise<string>;
+  poster?: string;
+  autoPlay?: boolean;
+  container?: 'm3u8' | 'ts' | 'mp4' | 'mkv';
+}
 
 export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<Plyr | null>(null);
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
-  const [hls, setHls] = useState<Hls | null>(null);
-  const [currentQuality, setCurrentQuality] = useState<number>(0);
-  const [qualities, setQualities] = useState<{ height: number; url: string }[]>([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const resolveSrc = async () => {
@@ -35,181 +35,125 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
   }, [src]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !resolvedSrc) return;
+    if (!videoRef.current || !resolvedSrc) return;
 
-    // Reset states
-    setIsBuffering(true);
-    setCurrentTime(0);
-    setDuration(0);
-    setIsPlaying(false);
-    setError(null);
+    // Initialize Plyr
+    const player = new Plyr(videoRef.current, {
+      controls: [
+        'play-large',
+        'play',
+        'progress',
+        'current-time',
+        'duration',
+        'mute',
+        'volume',
+        'captions',
+        'settings',
+        'pip',
+        'airplay',
+        'fullscreen',
+      ],
+      settings: ['captions', 'quality', 'speed'],
+      speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
+      keyboard: { focused: true, global: true },
+      tooltips: { controls: true, seek: true },
+      captions: { active: true, language: 'auto', update: true },
+    });
 
-    let hlsInstance: Hls | null = null;
+    playerRef.current = player;
 
+    // Handle different video formats
     const initializeVideo = () => {
-      // Try direct playback first
-      try {
-        video.src = resolvedSrc;
-        video.load();
-        video.play().then(() => {
-          setIsBuffering(false);
-          setIsPlaying(true);
-        }).catch((error) => {
-          console.log('Direct playback failed, trying HLS...', error);
-          
-          // If direct playback fails, try HLS
-          if (Hls.isSupported()) {
-            hlsInstance = new Hls({
-              enableWorker: true,
-              lowLatencyMode: false,
-              backBufferLength: 90,
-              xhrSetup: function(xhr) {
-                xhr.withCredentials = false;
-              },
-              maxLoadingRetry: 4,
-              manifestLoadingTimeOut: 20000,
-              manifestLoadingMaxRetry: 4,
-              manifestLoadingRetryDelay: 1000,
-            });
+      setIsLoading(true);
+      setError(null);
 
-            hlsInstance.loadSource(resolvedSrc);
-            hlsInstance.attachMedia(video);
+      const video = videoRef.current!;
+      let hls: Hls | null = null;
 
-            hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-              setIsBuffering(false);
-              if (autoPlay) {
-                video.play().catch(console.error);
-              }
-            });
+      const handleVideoError = (e: any) => {
+        console.error('Video error:', e);
+        setError('Video playback error');
+        setIsLoading(false);
+      };
 
-            hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-              console.log('HLS Error:', event, data);
-              if (data.fatal) {
-                switch (data.type) {
-                  case Hls.ErrorTypes.NETWORK_ERROR:
-                    console.error('Network error:', data.details);
-                    if (data.response) {
-                      console.log('Response:', data.response);
-                    }
-                    hlsInstance?.startLoad();
-                    break;
-                  case Hls.ErrorTypes.MEDIA_ERROR:
-                    console.error('Media error:', data.details);
-                    hlsInstance?.recoverMediaError();
-                    break;
-                  default:
-                    console.error('Fatal error:', data.type, data.details);
-                    setError('Stream error. Please try again.');
-                    if (hlsInstance) {
-                      hlsInstance.destroy();
-                    }
-                    break;
-                }
-              }
-            });
+      const handleLoadedData = () => {
+        setIsLoading(false);
+        if (autoPlay) {
+          video.play().catch(console.error);
+        }
+      };
 
-            setHls(hlsInstance);
-          } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS support (Safari)
-            video.src = resolvedSrc;
-          } else {
-            setError('Video playback not supported');
+      // Try HLS.js first for m3u8 files
+      if (container === 'm3u8' && Hls.isSupported()) {
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: false,
+          backBufferLength: 90,
+          xhrSetup: function(xhr) {
+            xhr.withCredentials = false;
+          },
+          maxLoadingRetry: 4,
+          manifestLoadingTimeOut: 20000,
+          manifestLoadingMaxRetry: 4,
+          manifestLoadingRetryDelay: 1000,
+        });
+
+        hls.loadSource(resolvedSrc);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setIsLoading(false);
+          if (autoPlay) {
+            video.play().catch(console.error);
           }
         });
-      } catch (error) {
-        console.error('Video initialization error:', error);
-        setError('Failed to initialize video player');
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.error('Network error:', data.details);
+                hls?.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.error('Media error:', data.details);
+                hls?.recoverMediaError();
+                break;
+              default:
+                console.error('Fatal error:', data.type, data.details);
+                setError('Stream error');
+                if (hls) {
+                  hls.destroy();
+                }
+                break;
+            }
+          }
+        });
+      } else {
+        // Direct playback for other formats
+        video.src = resolvedSrc;
+        video.addEventListener('error', handleVideoError);
+        video.addEventListener('loadeddata', handleLoadedData);
       }
+
+      return () => {
+        if (hls) {
+          hls.destroy();
+        }
+        video.removeEventListener('error', handleVideoError);
+        video.removeEventListener('loadeddata', handleLoadedData);
+      };
     };
 
-    initializeVideo();
+    const cleanup = initializeVideo();
 
-    // Event listeners
-    const handleWaiting = () => setIsBuffering(true);
-    const handlePlaying = () => setIsBuffering(false);
-    const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-      if (video.currentTime > 0 && !video.paused) {
-        setIsBuffering(false);
-      }
-    };
-    const handleDurationChange = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-    const handleVolumeChange = () => setVolume(video.volume);
-    const handleError = () => {
-      console.error('Video error:', video.error);
-      setError('Video playback error');
-      setIsBuffering(false);
-    };
-
-    video.addEventListener('waiting', handleWaiting);
-    video.addEventListener('playing', handlePlaying);
-    video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('durationchange', handleDurationChange);
-    video.addEventListener('play', handlePlay);
-    video.addEventListener('pause', handlePause);
-    video.addEventListener('ended', handleEnded);
-    video.addEventListener('volumechange', handleVolumeChange);
-    video.addEventListener('error', handleError);
-
-    if (autoPlay) {
-      video.play().catch(console.error);
-    }
-
-    // Cleanup
     return () => {
-      if (hlsInstance) {
-        hlsInstance.destroy();
-      }
-      if (video) {
-        video.removeEventListener('waiting', handleWaiting);
-        video.removeEventListener('playing', handlePlaying);
-        video.removeEventListener('timeupdate', handleTimeUpdate);
-        video.removeEventListener('durationchange', handleDurationChange);
-        video.removeEventListener('play', handlePlay);
-        video.removeEventListener('pause', handlePause);
-        video.removeEventListener('ended', handleEnded);
-        video.removeEventListener('volumechange', handleVolumeChange);
-        video.removeEventListener('error', handleError);
+      cleanup();
+      if (playerRef.current) {
+        playerRef.current.destroy();
       }
     };
-  }, [resolvedSrc, autoPlay]);
-
-  const handlePlayPause = () => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play().catch(console.error);
-    }
-  };
-
-  const handleSeek = (time: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = time;
-  };
-
-  const handleVolumeChange = (newVolume: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.volume = newVolume;
-  };
-
-  const handleFullscreen = () => {
-    if (!videoRef.current) return;
-    if (!document.fullscreenElement) {
-      videoRef.current.requestFullscreen().catch(console.error);
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(console.error);
-      setIsFullscreen(false);
-    }
-  };
+  }, [resolvedSrc, container, autoPlay]);
 
   return (
     <div className="relative group">
@@ -220,31 +164,23 @@ export function VideoPlayer({ src, poster, autoPlay = false, container = 'm3u8' 
       ) : null}
       <video
         ref={videoRef}
-        className="w-full aspect-video bg-black"
+        className="w-full aspect-video bg-black plyr"
         poster={poster}
+        crossOrigin="anonymous"
         playsInline
-        controls
-      />
-      {isBuffering && !error && (
+      >
+        <source src={resolvedSrc || undefined} type={
+          container === 'm3u8' ? 'application/x-mpegURL' :
+          container === 'mp4' ? 'video/mp4' :
+          container === 'mkv' ? 'video/x-matroska' :
+          'video/mp4'
+        } />
+      </video>
+      {isLoading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
           <Loader2 className="w-8 h-8 text-white animate-spin" />
         </div>
       )}
-      <VideoControls
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        duration={duration}
-        volume={volume}
-        isFullscreen={isFullscreen}
-        onPlayPause={handlePlayPause}
-        onSeek={handleSeek}
-        onVolumeChange={handleVolumeChange}
-        qualities={qualities}
-        currentQuality={currentQuality}
-        isBuffering={isBuffering}
-        onQualityChange={() => {}}
-        onToggleFullscreen={handleFullscreen}
-      />
     </div>
   );
 }

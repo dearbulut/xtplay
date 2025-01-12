@@ -39,12 +39,8 @@ export async function fetchFromApi(action: string, params: Record<string, string
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series`;
   } else if (action === 'get_categories') {
     url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_categories`;
-  } else if (action === 'get_series_info') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${params.series_id}`;
-  } else if (action === 'get_series_seasons') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}`;
-  } else if (action === 'get_series_episodes') {
-    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}&season=${params.season_number}`;
+  } else if (action === 'get_series_info' || action === 'get_series_seasons' || action === 'get_series_episodes') {
+    url = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_series&series_id=${params.series_id}${params.season_number ? `&season=${params.season_number}` : ''}`;
   } else {
     url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
   }
