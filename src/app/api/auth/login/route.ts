@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSession } from '@/lib/api/auth';
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   try {
     const { url, username } = await request.json();

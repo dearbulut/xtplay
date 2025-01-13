@@ -28,9 +28,16 @@ interface AuthResponse {
   server_info: ServerInfo;
 }
 
-export async function getSession() {
-  const cookieStore = cookies();
-  const token = cookieStore.get('session')?.value;
+export async function getSession(request?: Request) {
+  let token: string | undefined;
+
+  if (request) {
+    // For middleware (edge runtime)
+    token = request.headers.get('cookie')?.split('; ').find(row => row.startsWith('session='))?.split('=')[1];
+  } else {
+    // For server components
+    token = cookies().get('session')?.value;
+  }
 
   if (!token) {
     return null;
