@@ -22,7 +22,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
   useEffect(() => {
     async function fetchData() {
       try {
-        const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
+        console.log('Fetching series info for ID:', params.id);
+        const seriesData = await fetchFromApi('get_series_info', { series_id: params.id });
+        console.log('Series data received:', seriesData);
         
         // Restructure the episodes data into seasons
         if (seriesData.episodes) {
@@ -39,10 +41,15 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             const episodeArray = Array.isArray(episodes) ? episodes : Object.values(episodes);
             episodesBySeason[seasonNum] = episodeArray.map((episode: any) => ({
               ...episode,
+              id: episode.id || `${params.id}_${seasonNum}_${episode.episode_num}`,
               season_number: parseInt(seasonNum),
               episode_num: episode.episode_num || 1,
               title: episode.title || `Episode ${episode.episode_num || 1}`,
-              container_extension: episode.container_extension || 'mp4'
+              container_extension: episode.container_extension || 'mp4',
+              info: {
+                ...episode.info,
+                movie_image: episode.info?.movie_image || seriesData.cover
+              }
             }));
           });
 
@@ -52,18 +59,28 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
 
           // Create seasons array
           sortedSeasons.forEach((seasonNum) => {
-            seasons.push({
-              season_number: parseInt(seasonNum),
-              episodes: episodesBySeason[seasonNum].sort((a, b) => a.episode_num - b.episode_num)
-            });
+            const seasonEpisodes = episodesBySeason[seasonNum].sort((a, b) => 
+              (a.episode_num || 0) - (b.episode_num || 0)
+            );
+            
+            if (seasonEpisodes.length > 0) {
+              seasons.push({
+                season_number: parseInt(seasonNum),
+                episodes: seasonEpisodes
+              });
+            }
           });
 
           // Update series data with restructured seasons
           const updatedSeriesData = {
             ...seriesData,
-            seasons
+            seasons: seasons.length > 0 ? seasons : [{
+              season_number: 1,
+              episodes: []
+            }]
           };
 
+          console.log('Processed series data:', updatedSeriesData);
           setSeries(updatedSeriesData);
           
           // Select first episode of first season by default
@@ -71,9 +88,25 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             setSelectedSeason(seasons[0].season_number);
             setSelectedEpisode(seasons[0].episodes[0]);
           }
+        } else {
+          console.warn('No episodes data found in series response');
+          setSeries({
+            ...seriesData,
+            seasons: [{
+              season_number: 1,
+              episodes: []
+            }]
+          });
         }
       } catch (error) {
         console.error('Failed to fetch series data:', error);
+        setSeries({
+          name: 'Error loading series',
+          seasons: [{
+            season_number: 1,
+            episodes: []
+          }]
+        });
       } finally {
         setLoading(false);
       }

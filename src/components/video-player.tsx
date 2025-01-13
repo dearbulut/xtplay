@@ -57,19 +57,23 @@ export function VideoPlayer({ src, poster, autoPlay = false, isDirectMp4 = false
     const resolveSrc = async () => {
       try {
         const finalSrc = typeof src === 'string' ? src : await src;
+        console.log('Original source:', finalSrc);
         
-        // Check if it's an MKV file
-        if (finalSrc.toLowerCase().endsWith('.mkv')) {
+        // Check if it's an MKV file or needs transcoding
+        if (finalSrc.toLowerCase().endsWith('.mkv') || finalSrc.toLowerCase().endsWith('.avi')) {
           // Extract stream ID and type from the URL
-          const match = finalSrc.match(/\/(live|movie|series)\/.*?\/(\d+)\.mkv/);
+          const match = finalSrc.match(/\/(live|movie|series)\/.*?\/(\d+)\.(mkv|avi|mp4)/);
           if (match) {
             const [, streamType, streamId] = match;
-            // Use transcoding endpoint for MKV files
-            setResolvedSrc(`/api/transcode?stream_id=${streamId}&stream_type=${streamType}`);
+            const transcodedUrl = `/api/transcode?stream_id=${streamId}&stream_type=${streamType}&format=mkv`;
+            console.log('Using transcoded URL:', transcodedUrl);
+            setResolvedSrc(transcodedUrl);
           } else {
+            console.log('No match found for transcoding, using original URL');
             setResolvedSrc(finalSrc);
           }
         } else {
+          console.log('Using original URL');
           setResolvedSrc(finalSrc);
         }
       } catch (error) {
