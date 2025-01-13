@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { VideoPlayer } from '@/components/video-player';
-import { getSeriesInfo } from '@/lib/xtream-parser';
+import { getSeriesInfo, getActiveProfile } from '@/lib/xtream-parser';
 import { Loader2 } from 'lucide-react';
 
 interface Episode {
@@ -40,19 +40,13 @@ export default function SeriesPage() {
     async function fetchSeries() {
       try {
         setLoading(true);
-        // Get active profile from user context
-        const profile = {
-          url: localStorage.getItem('xtream_url'),
-          username: localStorage.getItem('xtream_username'),
-          password: localStorage.getItem('xtream_password'),
-        };
-
-        if (!profile.url || !profile.username || !profile.password) {
+        const profile = getActiveProfile();
+        if (!profile) {
           setError('No active IPTV profile');
           return;
         }
+
         const data = await getSeriesInfo(id as string, profile);
-        
         if (data) {
           setSeries(data);
           if (data.seasons.length > 0) {

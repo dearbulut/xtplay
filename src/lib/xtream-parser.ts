@@ -72,3 +72,15 @@ export async function getSeriesInfo(seriesId: string, profile: XtreamProfile) {
     return null;
   }
 }
+
+export function getActiveProfile(): XtreamProfile | null {
+  const url = localStorage.getItem('xtream_url');
+  const username = localStorage.getItem('xtream_username');
+  const password = localStorage.getItem('xtream_password');
+
+  if (!url || !username || !password) {
+    return null;
+  }
+
+  return { url, username, password };
+}
