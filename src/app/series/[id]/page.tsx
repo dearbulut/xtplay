@@ -40,14 +40,17 @@ export default function SeriesPage() {
     async function fetchSeries() {
       try {
         setLoading(true);
-        // Get active profile from localStorage
-        const activeProfile = localStorage.getItem('activeProfile');
-        if (!activeProfile) {
+        // Get active profile from user context
+        const profile = {
+          url: localStorage.getItem('xtream_url'),
+          username: localStorage.getItem('xtream_username'),
+          password: localStorage.getItem('xtream_password'),
+        };
+
+        if (!profile.url || !profile.username || !profile.password) {
           setError('No active IPTV profile');
           return;
         }
-
-        const profile = JSON.parse(activeProfile);
         const data = await getSeriesInfo(id as string, profile);
         
         if (data) {
