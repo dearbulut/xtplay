@@ -1,40 +1,33 @@
-export interface Series {
-  series_id: string;
-  name: string;
-  cover?: string;
-  category_id: string;
-  rating?: number;
-}
-
-export interface Category {
-  category_id: string;
-  category_name: string;
-}
-
-
-export interface Channel {
-  id: string;
-  displayName: string;
-  icon: string;
-}
-
-export interface Programme {
-  title: string;
-  desc: string;
-  start: string;
-  stop: string;
-  end: string;
-  channel: string;
-}
-
-export interface EPGData {
-  channels: Channel[];
-  programmes: Programme[];
-}
-
 export interface VideoPlayerProps {
   src: string | Promise<string>;
   poster?: string;
   autoPlay?: boolean;
-  isDirectMp4?: boolean;
+}
+
+export interface SeriesEpisode {
+  id: string;
+  title: string;
+  episode_num: number;
+  info: {
+    movie_image?: string;
+    duration_secs?: number;
+    plot?: string;
+  };
+  container_extension: string;
+}
+
+export interface SeriesSeason {
+  season_number: number;
+  episodes: SeriesEpisode[];
+}
+
+export interface Series {
+  name: string;
+  cover?: string;
+  plot?: string;
+  cast?: string;
+  director?: string;
+  genre?: string;
+  rating?: string;
+  seasons: SeriesSeason[];
 }
