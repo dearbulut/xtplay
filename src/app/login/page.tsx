@@ -1,16 +1,122 @@
-import { LoginForm } from "@/components/login-form";
-import Link from "next/link";
+'use client';
 
-export default function LoginPage() {
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { verifyCredentials } from '@/lib/api/auth';
+
+export default function Login() {
+  const [url, setUrl] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      await verifyCredentials(url, username, password);
+      
+      // Store credentials
+      document.cookie = `iptv_password=${password}; path=/; max-age=86400; samesite=lax`;
+
+      // Create session
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, username }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      router.push('/live');
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Invalid credentials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="w-full max-w-md">
-        <LoginForm />
-        <div className="text-right mt-4 text-sm">
-          <Link href="/register" className="hover:underline">
-            Don't have an account? Register here
-          </Link>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold">Welcome back</h1>
+          <p className="mt-2 text-muted-foreground">
+            Enter your IPTV credentials to continue
+          </p>
         </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="url" className="block text-sm font-medium">
+                Server URL
+              </label>
+              <input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                placeholder="http://example.com"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium">
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="rounded-md bg-destructive/15 p-3">
+              <div className="flex">
+                <div className="flex-1 text-sm font-medium text-destructive">
+                  {error}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50"
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
       </div>
     </div>
   );

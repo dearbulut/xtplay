@@ -1,5 +1,10 @@
 import { cookies } from 'next/headers';
 import { getActiveProfile } from '../client-profile';
+import { jwtVerify, SignJWT } from 'jose';
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'your-secret-key'
+);
 
 interface UserInfo {
   username: string;
@@ -21,6 +26,38 @@ interface ServerInfo {
 interface AuthResponse {
   user_info: UserInfo;
   server_info: ServerInfo;
+}
+
+export async function getSession() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('session')?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const verified = await jwtVerify(token, JWT_SECRET);
+    return verified.payload as { username: string; url: string };
+  } catch (err) {
+    return null;
+  }
+}
+
+export async function createSession(url: string, username: string) {
+  const token = await new SignJWT({ username, url })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('1d')
+    .sign(JWT_SECRET);
+
+  cookies().set('session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  });
+
+  return token;
 }
 
 export async function verifyCredentials(url: string, username: string, password: string): Promise<AuthResponse> {
@@ -52,6 +89,11 @@ export async function verifyCredentials(url: string, username: string, password:
 }
 
 export async function getIPTVCredentials() {
+  const session = await getSession();
+  if (!session) {
+    throw new Error('No active session');
+  }
+
   const activeProfile = getActiveProfile();
   if (activeProfile) {
     return {
@@ -63,15 +105,17 @@ export async function getIPTVCredentials() {
 
   // Fallback to cookies
   const cookieStore = cookies();
-  const baseUrl = cookieStore.get('iptv_url')?.value;
-  const username = cookieStore.get('iptv_username')?.value;
   const password = cookieStore.get('iptv_password')?.value;
 
-  if (!baseUrl || !username || !password) {
+  if (!session.url || !session.username || !password) {
     throw new Error('No IPTV credentials found');
   }
 
-  return { baseUrl, username, password };
+  return {
+    baseUrl: session.url,
+    username: session.username,
+    password,
+  };
 }
 
 export async function fetchFromAPI(action: string, params: Record<string, string> = {}, retryCount = 3): Promise<any> {
