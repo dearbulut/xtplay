@@ -23,12 +23,54 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
     async function fetchData() {
       try {
         const seriesData = await fetchFromApi(`get_series_info&series_id=${params.id}`);
-        setSeries(seriesData);
         
-        // Select first episode of first season by default
-        if (seriesData.seasons && seriesData.seasons[0] && seriesData.seasons[0].episodes[0]) {
-          setSelectedSeason(1);
-          setSelectedEpisode(seriesData.seasons[0].episodes[0]);
+        // Restructure the episodes data into seasons
+        if (seriesData.episodes) {
+          const seasons: any[] = [];
+          const episodesBySeason: { [key: string]: any[] } = {};
+
+          // Group episodes by season
+          Object.entries(seriesData.episodes).forEach(([seasonNum, episodes]: [string, any]) => {
+            if (!episodesBySeason[seasonNum]) {
+              episodesBySeason[seasonNum] = [];
+            }
+            
+            // Convert episodes object to array if needed
+            const episodeArray = Array.isArray(episodes) ? episodes : Object.values(episodes);
+            episodesBySeason[seasonNum] = episodeArray.map((episode: any) => ({
+              ...episode,
+              season_number: parseInt(seasonNum),
+              episode_num: episode.episode_num || 1,
+              title: episode.title || `Episode ${episode.episode_num || 1}`,
+              container_extension: episode.container_extension || 'mp4'
+            }));
+          });
+
+          // Sort seasons numerically
+          const sortedSeasons = Object.keys(episodesBySeason)
+            .sort((a, b) => parseInt(a) - parseInt(b));
+
+          // Create seasons array
+          sortedSeasons.forEach((seasonNum) => {
+            seasons.push({
+              season_number: parseInt(seasonNum),
+              episodes: episodesBySeason[seasonNum].sort((a, b) => a.episode_num - b.episode_num)
+            });
+          });
+
+          // Update series data with restructured seasons
+          const updatedSeriesData = {
+            ...seriesData,
+            seasons
+          };
+
+          setSeries(updatedSeriesData);
+          
+          // Select first episode of first season by default
+          if (seasons.length > 0 && seasons[0].episodes.length > 0) {
+            setSelectedSeason(seasons[0].season_number);
+            setSelectedEpisode(seasons[0].episodes[0]);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch series data:', error);

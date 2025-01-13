@@ -57,7 +57,21 @@ export function VideoPlayer({ src, poster, autoPlay = false, isDirectMp4 = false
     const resolveSrc = async () => {
       try {
         const finalSrc = typeof src === 'string' ? src : await src;
-        setResolvedSrc(finalSrc);
+        
+        // Check if it's an MKV file
+        if (finalSrc.toLowerCase().endsWith('.mkv')) {
+          // Extract stream ID and type from the URL
+          const match = finalSrc.match(/\/(live|movie|series)\/.*?\/(\d+)\.mkv/);
+          if (match) {
+            const [, streamType, streamId] = match;
+            // Use transcoding endpoint for MKV files
+            setResolvedSrc(`/api/transcode?stream_id=${streamId}&stream_type=${streamType}`);
+          } else {
+            setResolvedSrc(finalSrc);
+          }
+        } else {
+          setResolvedSrc(finalSrc);
+        }
       } catch (error) {
         console.error('Failed to resolve stream URL:', error);
         setError('Could not retrieve stream URL');
@@ -100,11 +114,18 @@ export function VideoPlayer({ src, poster, autoPlay = false, isDirectMp4 = false
       // Create new HLS instance
       hlsInstance = new Hls({
         enableWorker: true,
-        lowLatencyMode: false,
-        maxBufferLength: 30,
+        lowLatencyMode: true,
+        maxBufferLength: 60,
         maxMaxBufferLength: 600,
+        maxBufferSize: 60 * 1000 * 1000, // 60MB
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 6,
         manifestLoadingMaxRetry: MAX_MANIFEST_RETRIES,
-        manifestLoadingRetryDelay: 2000, // 2 seconds delay between retries
+        manifestLoadingRetryDelay: 1000, // 1 second delay between retries
+        levelLoadingTimeOut: 10000, // 10 seconds
+        fragLoadingTimeOut: 20000, // 20 seconds
         xhrSetup: function(xhr, url) {
           //console.log('Loading URL:', url);
           // Increase timeout for slow streams
