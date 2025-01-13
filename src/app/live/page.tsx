@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { VideoPlayer } from '@/components/video-player';
-import { getCategories, getStreams, getStreamUrl } from '@/lib/api/auth';
+import { getCategories, getStreams, getStreamUrl } from '@/lib/api/auth/client';
 import { Loader2 } from 'lucide-react';
 
 interface Channel {

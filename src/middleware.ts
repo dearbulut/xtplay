@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSession } from './lib/api/auth';
+import { getSession } from './lib/api/auth/server';
 
 export const runtime = 'edge';
 
