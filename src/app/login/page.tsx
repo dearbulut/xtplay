@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { verifyCredentials } from '@/lib/api/auth';
+import { authenticate, storeCredentials } from '@/lib/xtream';
 
 export default function Login() {
   const [url, setUrl] = useState('');
@@ -18,22 +18,13 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await verifyCredentials(url, username, password);
+      const result = await authenticate(url, username, password);
       
-      // Store credentials
-      document.cookie = `iptv_password=${password}; path=/; max-age=86400; samesite=lax`;
-
-      // Create session
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, username }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Login failed');
+      if (!result?.user_info?.auth) {
+        throw new Error('Invalid credentials');
       }
 
+      storeCredentials({ url, username, password });
       router.push('/live');
     } catch (error) {
       console.error('Login error:', error);

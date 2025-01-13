@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { VideoPlayer } from '@/components/video-player';
-import { getCategories, getStreams, getStreamUrl } from '@/lib/api/auth/client';
+import { getLiveCategories, getLiveStreams, getLiveStreamUrl, getStoredCredentials } from '@/lib/xtream';
 import { Loader2 } from 'lucide-react';
 
 interface Channel {
@@ -25,11 +26,18 @@ export default function LiveTV() {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchCategories() {
       try {
-        const data = await getCategories('live');
+        const credentials = getStoredCredentials();
+        if (!credentials) {
+          router.push('/login');
+          return;
+        }
+
+        const data = await getLiveCategories(credentials);
         if (data && Array.isArray(data)) {
           setCategories(data);
           if (data.length > 0) {
@@ -43,7 +51,7 @@ export default function LiveTV() {
     }
 
     fetchCategories();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     async function fetchChannels() {
@@ -51,7 +59,13 @@ export default function LiveTV() {
 
       try {
         setLoading(true);
-        const data = await getStreams('live', selectedCategory);
+        const credentials = getStoredCredentials();
+        if (!credentials) {
+          router.push('/login');
+          return;
+        }
+
+        const data = await getLiveStreams(credentials, selectedCategory);
         if (data && Array.isArray(data)) {
           setChannels(data);
           if (data.length > 0 && !selectedChannel) {
@@ -67,7 +81,7 @@ export default function LiveTV() {
     }
 
     fetchChannels();
-  }, [selectedCategory]);
+  }, [selectedCategory, router]);
 
   if (error) {
     return (
@@ -153,7 +167,7 @@ export default function LiveTV() {
             <h1 className="text-2xl font-bold">{selectedChannel.name}</h1>
             <div className="rounded-lg overflow-hidden">
               <VideoPlayer
-                src={getStreamUrl(selectedChannel.stream_id, 'live')}
+                src={getLiveStreamUrl(getStoredCredentials()!, selectedChannel.stream_id)}
                 autoPlay
               />
             </div>

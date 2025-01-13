@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSession } from './lib/api/auth/server';
 
-export const runtime = 'edge';
+export function middleware(request: NextRequest) {
+  // Get stored credentials from localStorage
+  const url = request.cookies.get('xtream_url')?.value;
+  const username = request.cookies.get('xtream_username')?.value;
+  const password = request.cookies.get('xtream_password')?.value;
 
-export async function middleware(request: NextRequest) {
-  const session = await getSession(request);
-
-  if (!session && !request.nextUrl.pathname.startsWith('/login') && !request.nextUrl.pathname.startsWith('/register')) {
+  // If no credentials and not on login page, redirect to login
+  if (!url && !username && !password && !request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -16,6 +17,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|register|login).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };
