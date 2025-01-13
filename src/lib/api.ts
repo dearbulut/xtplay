@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { getActiveProfile } from "./client-profile";
 
@@ -55,6 +55,10 @@ export async function fetchFromApi(action: string, params: Record<string, string
     }
 
     return data;
+  } catch (error) {
+    console.error('API request error:', error);
+    throw error;
+  }
 }
 
 export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie' | 'series') {
@@ -64,7 +68,14 @@ export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie
     throw new Error('Missing IPTV credentials');
   }
 
-  return `${baseUrl}/${streamType}/${username}/${password}/${streamId}.m3u8`;
+  try {
+    const url = `${baseUrl}/${streamType}/${username}/${password}/${streamId}`;
+    console.log('Stream URL:', url);
+    return url;
+  } catch (error) {
+    console.error('Error generating stream URL:', error);
+    throw error;
+  }
 }
 
 export async function verifyIPTVCredentials(url: string, username: string, password: string) {
