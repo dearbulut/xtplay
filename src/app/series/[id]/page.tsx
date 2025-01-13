@@ -1,35 +1,67 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
-import { fetchFromApi, getStreamUrl } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { fetchFromAPI, getStreamUrl } from '@/lib/auth';
 import { VideoPlayer } from '@/components/video-player';
 import { Film } from 'lucide-react';
 import Image from 'next/image';
 
 interface SeriesDetailsProps {
-  params: Promise<{
+  params: {
     id: string;
-  }>;
+  };
 }
 
-export default function SeriesDetails(props: SeriesDetailsProps) {
-  const params = use(props.params);
-  const [series, setSeries] = useState<any>(null);
+interface Episode {
+  id: string;
+  title: string;
+  episode_num: number;
+  info: {
+    movie_image?: string;
+    duration_secs?: number;
+    plot?: string;
+  };
+  container_extension: string;
+}
+
+interface Season {
+  season_number: number;
+  episodes: Episode[];
+}
+
+interface Series {
+  name: string;
+  cover?: string;
+  plot?: string;
+  cast?: string;
+  director?: string;
+  genre?: string;
+  rating?: string;
+  seasons: Season[];
+}
+
+export default function SeriesDetails({ params }: SeriesDetailsProps) {
+  const [series, setSeries] = useState<Series | null>(null);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
-  const [selectedEpisode, setSelectedEpisode] = useState<any>(null);
+  const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
         console.log('Fetching series info for ID:', params.id);
-        const seriesData = await fetchFromApi('get_series_info', { series_id: params.id });
+        const seriesData = await fetchFromAPI('get_series_info', { series_id: params.id });
         console.log('Series data received:', seriesData);
         
-        // Restructure the episodes data into seasons
+        if (!seriesData) {
+          throw new Error('No series data received');
+        }
+
+        // Process episodes data
         if (seriesData.episodes) {
-          const seasons: any[] = [];
-          const episodesBySeason: { [key: string]: any[] } = {};
+          const seasons: Season[] = [];
+          const episodesBySeason: { [key: string]: Episode[] } = {};
 
           // Group episodes by season
           Object.entries(seriesData.episodes).forEach(([seasonNum, episodes]: [string, any]) => {
@@ -40,16 +72,15 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             // Convert episodes object to array if needed
             const episodeArray = Array.isArray(episodes) ? episodes : Object.values(episodes);
             episodesBySeason[seasonNum] = episodeArray.map((episode: any) => ({
-              ...episode,
               id: episode.id || `${params.id}_${seasonNum}_${episode.episode_num}`,
-              season_number: parseInt(seasonNum),
-              episode_num: episode.episode_num || 1,
-              title: episode.title || `Episode ${episode.episode_num || 1}`,
-              container_extension: episode.container_extension || 'mp4',
+              title: episode.title || `Episode ${episode.episode_num}`,
+              episode_num: parseInt(episode.episode_num) || 1,
               info: {
-                ...episode.info,
-                movie_image: episode.info?.movie_image || seriesData.cover
-              }
+                movie_image: episode.info?.movie_image || seriesData.cover,
+                duration_secs: episode.info?.duration_secs,
+                plot: episode.info?.plot || episode.overview
+              },
+              container_extension: episode.container_extension || 'mp4'
             }));
           });
 
@@ -60,7 +91,7 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
           // Create seasons array
           sortedSeasons.forEach((seasonNum) => {
             const seasonEpisodes = episodesBySeason[seasonNum].sort((a, b) => 
-              (a.episode_num || 0) - (b.episode_num || 0)
+              a.episode_num - b.episode_num
             );
             
             if (seasonEpisodes.length > 0) {
@@ -71,9 +102,15 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             }
           });
 
-          // Update series data with restructured seasons
-          const updatedSeriesData = {
-            ...seriesData,
+          // Update series data
+          const updatedSeriesData: Series = {
+            name: seriesData.name,
+            cover: seriesData.cover,
+            plot: seriesData.plot,
+            cast: seriesData.cast,
+            director: seriesData.director,
+            genre: seriesData.genre,
+            rating: seriesData.rating,
             seasons: seasons.length > 0 ? seasons : [{
               season_number: 1,
               episodes: []
@@ -89,35 +126,37 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             setSelectedEpisode(seasons[0].episodes[0]);
           }
         } else {
-          console.warn('No episodes data found in series response');
-          setSeries({
-            ...seriesData,
-            seasons: [{
-              season_number: 1,
-              episodes: []
-            }]
-          });
+          throw new Error('No episodes data found');
         }
       } catch (error) {
         console.error('Failed to fetch series data:', error);
-        setSeries({
-          name: 'Error loading series',
-          seasons: [{
-            season_number: 1,
-            episodes: []
-          }]
-        });
+        setError(error instanceof Error ? error.message : 'Failed to load series');
       } finally {
         setLoading(false);
       }
     }
+
     fetchData();
   }, [params.id]);
 
-  if (loading || !series) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error || !series) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <p className="text-red-500">{error || 'Failed to load series'}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -179,8 +218,9 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         {selectedEpisode ? (
           <div className="rounded-lg overflow-hidden">
             <VideoPlayer
-              src={getStreamUrl( selectedEpisode.id, 'series')}
+              src={getStreamUrl(parseInt(selectedEpisode.id), 'series', selectedEpisode.container_extension)}
               poster={selectedEpisode.info?.movie_image || series.cover}
+              autoPlay
             />
           </div>
         ) : (
@@ -192,12 +232,14 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
         {/* Season and episode selection */}
         <div className="space-y-4">
           <div className="flex gap-2 overflow-x-auto pb-4">
-            {series.seasons?.map((season: any) => (
+            {series.seasons.map((season) => (
               <button
                 key={season.season_number}
                 onClick={() => setSelectedSeason(season.season_number)}
                 className={`px-4 py-2 rounded-full whitespace-nowrap ${
-                  selectedSeason === season.season_number ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+                  selectedSeason === season.season_number 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-secondary hover:bg-secondary/80'
                 }`}
               >
                 Season {season.season_number}
@@ -205,10 +247,10 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {series.seasons
-              ?.find((s: any) => s.season_number === selectedSeason)
-              ?.episodes.map((episode: any) => (
+              .find((s) => s.season_number === selectedSeason)
+              ?.episodes.map((episode) => (
                 <button
                   key={episode.id}
                   onClick={() => setSelectedEpisode(episode)}
@@ -234,6 +276,16 @@ export default function SeriesDetails(props: SeriesDetailsProps) {
                     <h3 className="font-medium line-clamp-2">
                       Episode {episode.episode_num}: {episode.title}
                     </h3>
+                    {episode.info?.plot && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                        {episode.info.plot}
+                      </p>
+                    )}
+                    {episode.info?.duration_secs && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {Math.floor(episode.info.duration_secs / 60)} minutes
+                      </p>
+                    )}
                   </div>
                 </button>
               ))}
