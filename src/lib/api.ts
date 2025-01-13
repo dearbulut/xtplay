@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { getActiveProfile } from "./client-profile";
 
@@ -27,19 +27,38 @@ export async function fetchFromApi(action: string, params: Record<string, string
     throw new Error('Missing IPTV credentials');
   }
 
-  const searchParams = new URLSearchParams({
-    username,
-    password,
-    ...params,
-  });
+  try {
+    const searchParams = new URLSearchParams({
+      username,
+      password,
+      ...params,
+    });
 
-  const response = await fetch(`${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`);
+    const url = `${baseUrl}/player_api.php?action=${action}&${searchParams.toString()}`;
+    console.log('Fetching from:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+    });
   
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
 
-  return response.json();
+    const data = await response.json();
+    if (!data) {
+      throw new Error('Empty response from API');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('API request error:', error);
+    throw error;
+  }
 }
 
 export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie' | 'series') {
@@ -49,7 +68,14 @@ export async function getStreamUrl(streamId: number, streamType: 'live' | 'movie
     throw new Error('Missing IPTV credentials');
   }
 
-  return `${baseUrl}/${streamType}/${username}/${password}/${streamId}.m3u8`;
+  try {
+    const url = `${baseUrl}/${streamType}/${username}/${password}/${streamId}`;
+    console.log('Stream URL:', url);
+    return url;
+  } catch (error) {
+    console.error('Error generating stream URL:', error);
+    throw error;
+  }
 }
 
 export async function verifyIPTVCredentials(url: string, username: string, password: string) {
